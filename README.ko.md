@@ -20,11 +20,17 @@ ACDC는 로컬 Claude Code와 Codex 세션 저장소를 읽어서, 필요한 곳
 
 ## 설치
 
-두 에이전트 모두 동일한 마켓플레이스 명령:
+**Claude Code** — CLI 안에서 슬래시 명령:
 
 ```
 /plugin marketplace add https://github.com/awithi-co/acdc
 /plugin install acdc
+```
+
+**Codex** — 쉘 명령 (marketplace add 한 번으로 등록 + enable까지):
+
+```
+codex plugin marketplace add awithi-co/acdc
 ```
 
 설치 후에는 자연어로 발동하면 됩니다 — 위 표의 발동 예시가 그대로 동작합니다. 플러그인의 manifest가 각 에이전트의 올바른 스킬로 요청을 라우팅합니다.

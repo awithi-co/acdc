@@ -20,11 +20,17 @@ Three skills per agent, each plugin self-contained.
 
 ## Install
 
-Same marketplace command for both agents:
+**Claude Code** — slash commands inside the CLI:
 
 ```
 /plugin marketplace add https://github.com/awithi-co/acdc
 /plugin install acdc
+```
+
+**Codex** — shell command (marketplace add registers and enables in one step):
+
+```
+codex plugin marketplace add awithi-co/acdc
 ```
 
 After install, trigger skills with natural language — the example invocations above work as-is. The plugin's manifest routes the request to the correct skill in each agent.
