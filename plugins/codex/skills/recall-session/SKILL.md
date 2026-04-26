@@ -1,6 +1,6 @@
 ---
 name: recall-session
-description: Use when the user asks Codex to look up one of its own past rollouts by name or UUID and summarize it. Examples: "show me the codex session feature-x", "show me rollout 019dc08e", "summarize the acdc rename session". For free-text topic search, use recall-context. For taking over a Claude session, use resume-claude-session.
+description: Use when the user asks Codex to look up one of its own past rollouts by name or UUID and summarize it. Examples include "show me the codex session feature-x", "show me rollout 019dc08e", "summarize the acdc rename session". For free-text topic search, use recall-context. For taking over a Claude session, use resume-claude-session.
 ---
 
 # Recall Codex session

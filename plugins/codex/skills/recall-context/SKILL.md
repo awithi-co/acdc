@@ -1,6 +1,6 @@
 ---
 name: recall-context
-description: Use when the user asks Codex to find content in past rollouts by topic or free-text query. Examples: "find where we decided on the ACDC name", "where did I just decide that", "find the testing strategy discussion". For lookup by session name or UUID, use recall-session. For taking over a Claude session, use resume-claude-session.
+description: Use when the user asks Codex to find content in past rollouts by topic or free-text query. Examples include "find where we decided on the ACDC name", "where did I just decide that", "find the testing strategy discussion". For lookup by session name or UUID, use recall-session. For taking over a Claude session, use resume-claude-session.
 ---
 
 # Recall Codex context

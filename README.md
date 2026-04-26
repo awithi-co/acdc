@@ -27,10 +27,17 @@ Three skills per agent, each plugin self-contained.
 /plugin install acdc
 ```
 
-**Codex** — shell command (marketplace add registers and enables in one step):
+**Codex** — shell command + enable:
 
 ```
 codex plugin marketplace add awithi-co/acdc
+```
+
+`marketplace add` registers ACDC as *available*. To activate it (so skills are discoverable by natural-language dispatch), either pick ACDC from `codex`'s interactive plugin picker, or append to `~/.codex/config.toml`:
+
+```toml
+[plugins."acdc@acdc"]
+enabled = true
 ```
 
 After install, trigger skills with natural language — the example invocations above work as-is. The plugin's manifest routes the request to the correct skill in each agent.

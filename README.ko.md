@@ -27,10 +27,17 @@ ACDC는 로컬 Claude Code와 Codex 세션 저장소를 읽어서, 필요한 곳
 /plugin install acdc
 ```
 
-**Codex** — 쉘 명령 (marketplace add 한 번으로 등록 + enable까지):
+**Codex** — 쉘 명령 + enable:
 
 ```
 codex plugin marketplace add awithi-co/acdc
+```
+
+`marketplace add`는 ACDC를 *사용 가능* 상태로 등록만 합니다. 자연어 디스패치로 스킬이 발견되려면 활성화가 필요합니다 — `codex` 인터랙티브 모드의 플러그인 피커에서 ACDC를 선택하거나, `~/.codex/config.toml`에 다음을 추가하세요:
+
+```toml
+[plugins."acdc@acdc"]
+enabled = true
 ```
 
 설치 후에는 자연어로 발동하면 됩니다 — 위 표의 발동 예시가 그대로 동작합니다. 플러그인의 manifest가 각 에이전트의 올바른 스킬로 요청을 라우팅합니다.

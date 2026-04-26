@@ -1,6 +1,6 @@
 ---
 name: recall-session
-description: Use when the user asks Claude to look up one of its own past sessions by name or UUID and summarize it. Examples: "show me the feature-x session", "/recall-session 019dc08e", "summarize yesterday's api-refactor session". For free-text topic search, use recall-context. For taking over a Codex session, use resume-codex-session.
+description: Use when the user asks Claude to look up one of its own past sessions by name or UUID and summarize it. Examples include "show me the feature-x session", "/recall-session 019dc08e", "summarize yesterday's api-refactor session". For free-text topic search, use recall-context. For taking over a Codex session, use resume-codex-session.
 ---
 
 # Recall Claude session
