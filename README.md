@@ -4,83 +4,49 @@
 
 **Read this in:** English · [한국어](README.ko.md)
 
-You're deep in a session with one coding agent — Claude Code or Codex — and something stops the flow. A rate limit hits. Context fills up. The other agent is just better suited for what comes next.
+The context of a coding-agent session — what you decided, what's already tried, where you left off — is the most valuable thing in the room. It's also fragile: rate limits stop you mid-flow, compaction leaves the agent foggy on earlier turns, and the trail goes cold across days.
 
-Or maybe you vaguely remember discussing something — last week, or earlier in this very session before compaction left the agent foggy on the details — and you want to find where.
+ACDC reads your local Claude Code and Codex sessions to put the context back where you need it.
 
-ACDC handles both situations on top of your local session storage:
+## What ACDC does
 
-- **Hand off** to the other agent — ACDC reads the prior session and current repo state, then hands a structured summary to the new agent so it can continue rather than echo the last few messages.
-- **Recall** one of your own past sessions by name or UUID — with a timeline summary of what you decided, what changed, and where you left off.
-- **Search** across your sessions by topic — find where you discussed that thing last week, or earlier in this session before compaction swallowed it.
+| Skill | What it does | Example invocation |
+|-------|--------------|--------------------|
+| `resume-codex-session` (Claude side) / `resume-claude-session` (Codex side) | Cross-agent handoff: read the prior session and current repo state, then hand a structured summary to the new agent so it continues rather than echoes the last few messages. | "resume the codex session called api-refactor" |
+| `recall-session` | Self-recall: look up your own past session by name or UUID. Returns a timeline summary — what you decided, what changed, where you left off. | "show me yesterday's api-refactor session" |
+| `recall-context` | Topic search: find where you discussed something across your sessions, even pre-compaction in the current one. | "where did we decide on the ACDC name" |
 
-## Supported handoff directions
+Three skills per agent, each plugin self-contained.
 
-- **Claude Code** takes over a **Codex** session
-- **Codex** takes over a **Claude Code** session
+## Install
 
-(Self-recall and topic search are per-agent — Claude searches its own transcripts, Codex searches its own rollouts.)
-
-## Requirements
-
-Python 3 on PATH. Pre-installed on macOS 12.3+ and most Linux distributions; on Windows, install from python.org if unavailable. The skill tries `uv run python`, then `python3`, then `python`, and stops with a clear message if none are found.
-
-## Install (Claude Code)
+Same marketplace command for both agents:
 
 ```
 /plugin marketplace add https://github.com/awithi-co/acdc
 /plugin install acdc
 ```
 
-Then invoke the skill with a session name or id:
-
-```
-/resume-codex-session <session-name>
-/resume-codex-session <session-id>
-```
-
-For example:
-
-```
-/resume-codex-session api-refactor       # a name, if you set one with /rename
-/resume-codex-session 019dc08e           # a UUID (prefix is fine)
-```
-
-## Install (Codex)
-
-```
-/plugin marketplace add https://github.com/awithi-co/acdc
-/plugin install acdc
-```
-
-Then invoke the skill with a session name or id:
-
-```
-/resume-claude-session <session-name>
-/resume-claude-session <session-id>
-```
-
-For example:
-
-```
-/resume-claude-session api-refactor      # a name, if you set one with /rename
-/resume-claude-session a3b5c9f2          # a UUID (prefix is fine)
-```
+After install, trigger skills with natural language — the example invocations above work as-is. The plugin's manifest routes the request to the correct skill in each agent.
 
 ## How it works
 
-Each direction ships a skill with two Python helpers:
+Each skill ships two Python helpers:
 
-- a session finder that scores local session candidates by name, cwd hint, and recency
-- a bounded summarizer that reconstructs the timeline from the transcript or rollout JSONL
+- a **finder** that scores local session candidates by name, cwd hint, and recency
+- a **bounded summarizer** that reconstructs the timeline from the transcript or rollout JSONL
 
-The skill then cross-checks the reconstructed state against the current `git status`, branch, and worktree before producing a handoff summary. The new agent acts on the handoff, not on raw transcript content.
+For **handoff**, the skill cross-checks the reconstructed state against the current `git status`, branch, and worktree before producing the summary. The new agent acts on the handoff, not on raw transcript content.
 
-Python 3 standard library only. No network access. Read-only against session storage.
+For **recall by identifier**, the same finder/summarizer pair is used without the repo cross-check (the agent already has its own context).
+
+For **topic search**, a `grep_recall.py` helper scans JSONL files (current session + recent partition) and returns matched segments with surrounding event context.
+
+Pure Python 3 standard library only. No network access. Read-only against session storage.
 
 ## Session storage layout
 
-Knowing where each agent keeps its data makes the handoff traceable. ACDC only reads these paths; it never writes to them.
+ACDC only reads these paths; it never writes to them.
 
 ### Claude Code — `~/.claude/`
 
@@ -108,30 +74,23 @@ history.jsonl                                          per-prompt log
 - `session_index.jsonl` is an accelerator for name lookup. It is not guaranteed to contain every rollout on disk, so the rollout tree is the source of truth.
 - Todos and plans are not separate files. They live inline in the rollout as `function_call` events (`update_plan`, `TodoWrite`).
 
-## Privacy model
+## Requirements
 
-ACDC reads local Claude Code and Codex session files on your machine to build a handoff for the current agent. It does not upload anything to an external service, and it does not sanitize or redact transcript content. Use it when you intentionally want one local coding agent to continue work from another.
+Python 3 on PATH. Pre-installed on macOS 12.3+ and most Linux distributions; on Windows, install from python.org if unavailable. The skill tries `uv run python`, then `python3`, then `python`, and stops with a clear message if none are found.
 
-## Limitations
+## Privacy & limitations
 
-- Assumes the new agent has local filesystem access to the other agent's session storage.
+- ACDC reads local session files on your machine to build a handoff or recall summary. It does **not** upload anything to an external service, and it does **not** sanitize or redact transcript content.
+- Each plugin needs local filesystem access to its own session storage (and to the other agent's storage when used for handoff).
 - Session storage formats are owned by their respective products; large version changes may require parser updates.
-- A session picker is needed when multiple candidates match the same name; the skill will show scored candidates and ask.
+- When multiple sessions match the same name, the skill shows scored candidates and asks.
 - If the original session's working directory was moved or deleted, repo-state verification falls back to filesystem checks.
 
-## Skills
+## Contributors
 
-ACDC ships three skills per plugin (one cross-agent resume + two self-recall):
+Each plugin is self-contained: `finder + summarizer` scripts are duplicated rather than symlinked, on the assumption that plugin install ships a directory tree.
 
-| Skill | Purpose | Example invocation |
-|-------|---------|--------------------|
-| `resume-codex-session` (Claude side) / `resume-claude-session` (Codex side) | Cross-agent handoff: take over the other agent's session by name or UUID | "resume the codex session called api-refactor" |
-| `recall-session` | Self-recall: look up your own past session by name or UUID | "show me yesterday's api-refactor session" |
-| `recall-context` | Self-recall: free-text topic search across your own current and recent sessions | "where did we decide on the ACDC name" |
-
-The two recall skills share the same finder/summarizer code as the resume skills, plus a new `grep_recall.py` helper that scans JSONL transcripts and returns matched segments with a context window. Each plugin is self-contained — finder/summarizer are duplicated rather than symlinked, on the assumption that plugin install ships a directory tree.
-
-> Contributors: when fixing a bug in `find_*_session.py` or `summarize_*.py`, mirror the fix to the corresponding `recall-session/scripts/` copy. Future work: extract shared helpers to a `_vendor/` location.
+> When fixing a bug in `find_*_session.py` or `summarize_*.py`, mirror the fix to the corresponding `recall-session/scripts/` copy. Future work: extract shared helpers to a `_vendor/` location.
 
 ## License
 
