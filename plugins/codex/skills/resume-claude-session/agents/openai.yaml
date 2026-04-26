@@ -1,0 +1,4 @@
+interface:
+  display_name: "Resume Claude Code session"
+  short_description: "Continue a Claude Code session inside Codex"
+  default_prompt: "Use $resume-claude-session to take over a Claude Code session by name or id."

@@ -1,0 +1,6 @@
+{"timestamp":"2026-04-26T10:00:00.000Z","type":"session_meta","payload":{"id":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:00:00.000Z","cwd":"/tmp/fixture-cwd","originator":"codex-tui","cli_version":"0.0.0","source":"cli","model_provider":"openai"}}
+{"timestamp":"2026-04-26T10:00:01.000Z","type":"turn_context","payload":{"turn_id":"t-acdc","cwd":"/tmp/fixture-cwd","model":"gpt-x"}}
+{"timestamp":"2026-04-26T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"agents-bridge 이름 ACDC로 바꿀까"}]}}
+{"timestamp":"2026-04-26T10:00:10.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"ACDC 좋아. Agent Context Delivery Channel 의 약자."}]}}
+{"timestamp":"2026-04-26T10:00:20.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"진행"}]}}
+{"timestamp":"2026-04-26T10:00:30.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"mv\",\"agents-bridge\",\"acdc\"]}"}}

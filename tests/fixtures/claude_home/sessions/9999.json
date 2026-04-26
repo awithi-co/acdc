@@ -1,0 +1,9 @@
+{
+  "pid": 9999,
+  "sessionId": "eeeeeeee-5555-4e55-e555-555555555555",
+  "cwd": "/tmp/fixture-cwd",
+  "startedAt": "2026-04-25T02:50:00.000Z",
+  "name": "live-name",
+  "updatedAt": "2026-04-25T02:50:00.000Z",
+  "status": "active"
+}

@@ -1,0 +1,5 @@
+{"type":"permission-mode","permissionMode":"default","sessionId":"ffffffff-6666-7f66-f666-666666666666"}
+{"type":"user","sessionId":"ffffffff-6666-7f66-f666-666666666666","timestamp":"2026-04-26T11:00:00.000Z","message":{"role":"user","content":"hello world"}}
+{"type":"assistant","sessionId":"ffffffff-6666-7f66-f666-666666666666","timestamp":"2026-04-26T11:00:05.000Z","message":{"role":"assistant","content":[{"type":"text","text":"hi there"}]}}
+not a json line at all
+{"type":"user","sessionId":"ffffffff-6666-7f66-f666-666666666666","timestamp":"2026-04-26T11:01:00.000Z","message":{"role":"user","content":"goodbye"}}

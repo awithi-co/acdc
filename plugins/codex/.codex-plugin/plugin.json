@@ -1,0 +1,32 @@
+{
+  "name": "acdc",
+  "version": "0.1.0",
+  "description": "Resume or continue a local Claude Code session from Codex. Reads the prior Claude transcript and current repo state, then hands off a structured summary so Codex takes over where Claude left off. Also includes recall-session and recall-context skills for self-recall over past sessions.",
+  "author": {
+    "name": "awithi-co",
+    "url": "https://github.com/awithi-co"
+  },
+  "homepage": "https://github.com/awithi-co/acdc",
+  "repository": "https://github.com/awithi-co/acdc",
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "codex",
+    "continue",
+    "resume",
+    "session",
+    "bridge"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ACDC",
+    "shortDescription": "Resume Claude Code sessions inside Codex",
+    "longDescription": "Resume or continue a local Claude Code session from Codex. Reads the Claude transcript, cross-checks current repo state, and produces a structured handoff — by session name or id.",
+    "category": "Productivity",
+    "capabilities": ["Read", "Interactive"],
+    "defaultPrompt": [
+      "Resume a Claude Code session by name or id.",
+      "Continue my Claude Code work in Codex."
+    ]
+  }
+}

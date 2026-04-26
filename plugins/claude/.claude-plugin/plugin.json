@@ -1,0 +1,19 @@
+{
+  "name": "acdc",
+  "description": "Resume or continue a local Codex session from Claude Code. Reads the prior Codex rollout and current repo state, then hands off a structured summary so Claude takes over where Codex left off. Also includes recall-session and recall-context skills for self-recall over past sessions.",
+  "version": "0.1.0",
+  "author": {
+    "name": "awithi-co"
+  },
+  "homepage": "https://github.com/awithi-co/acdc",
+  "repository": "https://github.com/awithi-co/acdc",
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "codex",
+    "continue",
+    "resume",
+    "session",
+    "bridge"
+  ]
+}

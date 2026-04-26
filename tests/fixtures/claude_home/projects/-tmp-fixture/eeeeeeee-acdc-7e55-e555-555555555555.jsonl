@@ -1,0 +1,10 @@
+{"type":"permission-mode","permissionMode":"default","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555"}
+{"type":"custom-title","customTitle":"acdc-rename-discussion","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555"}
+{"type":"user","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:00:00.000Z","message":{"role":"user","content":"agents-bridge 이름 어때 ACDC로 바꿀까"}}
+{"type":"assistant","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:00:05.000Z","message":{"role":"assistant","content":[{"type":"text","text":"ACDC는 AC/DC 전류 비유와 잘 맞아. Agent Context Delivery Channel 의 약자로 가자."}]}}
+{"type":"system","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","content":"system event with the word ACDC in metadata that should be filtered"}
+{"type":"attachment","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","content":"attachment with ACDC text"}
+{"type":"user","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:01:00.000Z","message":{"role":"user","content":"좋아 진행"}}
+{"type":"assistant","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:01:10.000Z","message":{"role":"assistant","content":[{"type":"text","text":"디렉토리 rename 시작할게."}]}}
+{"type":"assistant","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:02:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"mv agents-bridge acdc"}}]}}
+{"type":"user","sessionId":"eeeeeeee-acdc-7e55-e555-555555555555","timestamp":"2026-04-26T10:02:30.000Z","message":{"role":"user","content":"확인 완료"}}

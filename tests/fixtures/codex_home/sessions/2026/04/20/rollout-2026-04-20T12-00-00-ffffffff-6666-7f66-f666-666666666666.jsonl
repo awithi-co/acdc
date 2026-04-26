@@ -1,0 +1,4 @@
+{"timestamp":"2026-04-20T12:00:00.000Z","type":"session_meta","payload":{"id":"ffffffff-6666-7f66-f666-666666666666","timestamp":"2026-04-20T12:00:00.000Z","cwd":"/tmp/fixture-cwd","originator":"codex-tui","cli_version":"0.0.0","source":"cli","model_provider":"openai"}}
+{"timestamp":"2026-04-20T12:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"hello world"}]}}
+malformed line that is not json
+{"timestamp":"2026-04-20T12:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"hi there"}]}}
