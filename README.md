@@ -1,15 +1,25 @@
 # ACDC
 
-> Part of the [AWITHI](https://github.com/awithi-co) family — *AI with AI*. AC ↔ DC, context flowing both ways.
+> Part of the [AWITHI](https://github.com/awithi-co) family — *AI with AI*. ACDC = **A**gent **C**ontext **D**elivery **C**hannel — AC ↔ DC, context flowing both ways.
 
 **Read this in:** English · [한국어](README.ko.md)
 
-Continue local coding-agent sessions across Claude Code and Codex. When you hit a wall in one agent and want the other to pick up the work, ACDC reads the prior local session files and the current repo state, then hands a structured summary to the new agent so it can continue — not just echo the last few messages.
+You're deep in a session with one coding agent — Claude Code or Codex — and something stops the flow. A rate limit hits. Context fills up. The other agent is just better suited for what comes next.
 
-## Supported directions
+Or maybe you vaguely remember discussing something — last week, or earlier in this very session before compaction left the agent foggy on the details — and you want to find where.
+
+ACDC handles both situations on top of your local session storage:
+
+- **Hand off** to the other agent — ACDC reads the prior session and current repo state, then hands a structured summary to the new agent so it can continue rather than echo the last few messages.
+- **Recall** one of your own past sessions by name or UUID — with a timeline summary of what you decided, what changed, and where you left off.
+- **Search** across your sessions by topic — find where you discussed that thing last week, or earlier in this session before compaction swallowed it.
+
+## Supported handoff directions
 
 - **Claude Code** takes over a **Codex** session
 - **Codex** takes over a **Claude Code** session
+
+(Self-recall and topic search are per-agent — Claude searches its own transcripts, Codex searches its own rollouts.)
 
 ## Requirements
 
