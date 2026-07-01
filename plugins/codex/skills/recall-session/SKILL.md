@@ -23,12 +23,13 @@ uv run python <skill-dir>/scripts/find_codex_session.py <name-or-id> --json
 
 3. Pick the best candidate: score → cwd-hint match → newest `updated_at`. Surface multiple if scores tie closely.
 
-4. Summarize.
+4. Summarize. Map segments first — a rollout can hold several working sessions (multi-day thread) plus an `inherited replay` prefix copied in when the thread was forked; only live segments are this session's own work.
 
 ```bash
 ROLLOUT=<found-rollout-jsonl>
-uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --tail 0 --max-events 40
-uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --tail 120
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --segments
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --segment last
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --segment <N>
 uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --from-line <N> --max-events 80
 ```
 
