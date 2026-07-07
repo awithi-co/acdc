@@ -44,21 +44,31 @@ find ~/.codex/shell_snapshots -name "*${SESSION_ID}*" -print
 ```
 
 
-5. Read the rollout in bounded windows. Do not dump whole JSONL lines — one line can be several KB.
-   - Capture: original goal, mid-session scope changes, created/modified files, commits, failed tests, errors, last user request, last tool result, cwd changes, thread rename.
-   - Read **head first** (goal + session_meta + initial turns), **then tail** (recent state). Skip the middle unless you need a pivot.
+5. Map the rollout BEFORE reading it. A Codex rollout is often NOT one working session: resuming can fork a thread and replay the ancestor's entire history into the new file, and one thread id accumulates work across days under changing names. Naive head+tail reads then conflate several of the user's sessions (and inherited ancestor history) into "the session".
 
 ```bash
 ROLLOUT=<found-rollout-jsonl>
-uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --tail 0 --max-events 40     # head: goal, session_meta, initial turns
-uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --tail 120                    # tail: recent state
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --segments
+```
+
+   - The listing shows lineage (`forked_from`, embedded ancestor metas), an `inherited replay` segment (ancestor history copied in at the fork instant — NOT this session's own work), and live segments split on idle gaps (default 3h) with each segment's first user message.
+   - Decide which segment the user means. Usually it is the last one; if ambiguous (several recent segments with different topics), ask.
+
+6. Read the chosen segment in bounded windows. Do not dump whole JSONL lines — one line can be several KB.
+   - Capture: original goal, mid-session scope changes, created/modified files, commits, failed tests, errors, last user request, last tool result, cwd changes, thread rename.
+   - Read the segment's **head first** (goal + initial turns), **then tail** (recent state). Skip the middle unless you need a pivot.
+
+```bash
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --segment last                # the working session the user most likely means
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --segment <N>                # a specific segment from the --segments listing
+uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --tail 120                    # raw tail: recent state regardless of segments
 uv run python <skill-dir>/scripts/summarize_codex_rollout.py "$ROLLOUT" --from-line <N> --max-events 80   # pivot: specific error/rename line
 ```
 
    - `--limit` caps chars per event (default 700). If a tool output looks truncated mid-diff or mid-error, re-run the same window with `--limit 2000` to see it in full.
    - If the helper is missing, use `rg -n --only-matching` for line numbers and short matches, then open only small surrounding windows. Never print entire JSONL matches.
 
-6. Re-verify the actual working directory state.
+7. Re-verify the actual working directory state.
    - Do not trust the rollout for package installs, created files, test results, branch, or git status.
    - From the actual cwd (confirmed via `session_meta` or the latest `turn_context`), run:
 
@@ -70,7 +80,7 @@ git worktree list
 
    - If it is not a git repo, say so and verify via the filesystem instead.
 
-7. Before changing any files, build a short handoff summary:
+8. Before changing any files, build a short handoff summary:
    - Session name and Codex session id
    - Rollout path and shell snapshot path
    - Actual working directory and branch
@@ -79,7 +89,7 @@ git worktree list
    - The blocking point and any open risks
    - The first command or file to resume with
 
-8. Only resume work from a verified state.
+9. Only resume work from a verified state.
    - If the next step is clear and low-risk, proceed after presenting the handoff summary.
    - If the state is ambiguous, do not guess — ask the decision you need.
 
