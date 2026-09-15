@@ -58,6 +58,50 @@ class RelativeTargetTests(unittest.TestCase):
                 self.assertEqual(okf_node.relative_target(target, "decisions"), target)
 
 
+class ExplicitSlugTests(unittest.TestCase):
+    """Obsidian labels a graph node with its filename, so the filename is prose."""
+
+    def test_hangul_slug_is_kept_verbatim(self):
+        self.assertEqual(okf_node.clean_explicit_slug("워크트리-주인-하나"), "워크트리-주인-하나")
+
+    def test_a_trailing_md_is_dropped(self):
+        self.assertEqual(okf_node.clean_explicit_slug("거울-사본.md"), "거울-사본")
+
+    def test_path_separators_are_refused(self):
+        for bad in ("a/b", "a\\b", ".hidden", "", "   "):
+            with self.subTest(slug=bad):
+                with self.assertRaises(ValueError):
+                    okf_node.clean_explicit_slug(bad)
+
+    def test_reserved_names_are_still_refused_case_insensitively(self):
+        for bad in ("index", "Index", "LOG"):
+            with self.subTest(slug=bad):
+                with self.assertRaises(ValueError):
+                    okf_node.write_node({"bundle": "/tmp", "type": "Concept", "slug": bad})
+
+
+class EncodeTargetTests(unittest.TestCase):
+    def test_hangul_is_percent_encoded(self):
+        self.assertEqual(
+            okf_node.encode_target("../lessons/워크트리-주인-하나.md"),
+            "../lessons/%EC%9B%8C%ED%81%AC%ED%8A%B8%EB%A6%AC-%EC%A3%BC%EC%9D%B8-%ED%95%98%EB%82%98.md",
+        )
+
+    def test_a_space_is_encoded(self):
+        self.assertEqual(okf_node.encode_target("a b.md"), "a%20b.md")
+
+    def test_plain_ascii_is_untouched(self):
+        self.assertEqual(okf_node.encode_target("../concepts/brief.md"), "../concepts/brief.md")
+
+    def test_an_already_encoded_target_is_not_encoded_twice(self):
+        self.assertEqual(okf_node.encode_target("a%20b.md"), "a%20b.md")
+
+    def test_external_urls_are_left_alone(self):
+        self.assertEqual(
+            okf_node.encode_target("https://example.org/a b.md"), "https://example.org/a b.md"
+        )
+
+
 class WriteNodeTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -221,6 +265,18 @@ class WriteNodeTests(unittest.TestCase):
         self.assertIn("- [Sibling](other.md)", text)
         self.assertIn("- [Cousin](../concepts/x.md)", text)
         self.assertIn("- [Index](../index.md)", text)
+
+    def test_a_hangul_named_node_links_percent_encoded(self):
+        path = self.write(
+            slug="워크트리-주인-하나",
+            title="워크트리 단일 소유",
+            links=[{"text": "본체로서의 브리프", "target": "/concepts/본체로서의-브리프.md"}],
+        )
+        self.assertEqual(path.name, "워크트리-주인-하나.md")
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("](../concepts/%EB", text)
+        self.assertNotIn("](../concepts/본체", text)
+        self.assertIn("# 워크트리 단일 소유", text)
 
     def test_cli_reads_json_from_stdin(self):
         spec = {

@@ -79,6 +79,14 @@ uv run python <skill-dir>/../resume-codex-session/scripts/summarize_codex_rollou
      helper still enforces the no-state-nodes rule. Only an empty bundle gets
      the default `Decision` / `Lesson` / `Concept`. A parallel vocabulary in the
      same bundle splits the graph in two and is worse than an imperfect fit.
+   - **Name the files the way the bundle names them.** A graph viewer labels each
+     node with its *filename*, so in a bundle written in one language an ASCII
+     transliteration is what the reader sees. If the bundle's existing files are
+     named in the document language, pass an explicit `slug` in that language
+     (hyphens rather than spaces) and the helper keeps it verbatim; the links it
+     writes are percent-encoded, which is what CommonMark requires and what the
+     validator decodes. Without `slug` it falls back to an ASCII slug of the
+     title, which is right for an English bundle and wrong for any other.
    - **Match the neighbours' frontmatter too.** If the bundle's documents share
      fields OKF does not define — a `lifecycle` value, a `succeeded_by` pointer,
      tags, an owner — fill them through `extra` so a new node is

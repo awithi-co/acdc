@@ -15,7 +15,9 @@ Input (stdin, JSON object):
       "role":     "decision",              # decision | lesson | concept; inferred
                                           #   when `type` is one of the defaults
       "title":    "Vendor the OKF validator",
-      "slug":     "vendor-okf-validator",  # optional, derived from title
+      "slug":     "vendor-okf-validator",  # optional; derived from title (ASCII)
+                                          #   when given, kept verbatim — Hangul,
+                                          #   accents and spaces all allowed
       "status":   "draft",                 # optional, default "draft"
       "agent":    "claude",                # claude | codex; the source URI scheme
       "sources":  ["SHARE-260916"],        # strings, or {resource, id, title} dicts
@@ -51,6 +53,7 @@ import posixpath
 import re
 import sys
 import unicodedata
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -74,8 +77,29 @@ DEFAULT_GENERATED_BY = "acdc okf-distill"
 RESERVED = {"index", "log"}
 
 
+# A filename is not only an address: Obsidian's graph view labels each node with
+# it, so in a bundle written in one language an ASCII transliteration is what the
+# reader sees. An explicit `slug` is therefore kept verbatim — only the
+# characters that would make it something other than a filename are refused.
+SLUG_FORBIDDEN = re.compile(r"[/\\\x00-\x1f]")
+
+
+def clean_explicit_slug(text: str) -> str:
+    """Accept a caller-chosen filename in any script; refuse a non-filename."""
+    slug = text.strip()
+    if not slug:
+        raise ValueError("`slug` is empty")
+    if SLUG_FORBIDDEN.search(slug):
+        raise ValueError(f"`slug` may not contain a path separator or control character: {text!r}")
+    if slug.startswith("."):
+        raise ValueError(f"`slug` may not start with a dot: {text!r}")
+    if slug.lower().endswith(".md"):
+        slug = slug[:-3]  # the caller gave a filename; the extension is ours to add
+    return slug
+
+
 def slugify(text: str) -> str:
-    """Lowercase kebab-case ASCII. Keeps link targets free of percent-encoding."""
+    """Lowercase kebab-case ASCII — the default when no `slug` is given."""
     normalized = unicodedata.normalize("NFKD", text)
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_only).strip("-").lower()
@@ -184,10 +208,26 @@ def relative_target(target: str, subdir: str) -> str:
     outside the bundle (external URLs, anchors), are returned untouched.
     """
     if not target.startswith("/"):
-        return target
+        return encode_target(target)
     here = "/" + subdir.strip("/") if subdir.strip("/") else "/"
-    rel = posixpath.relpath(target, here)
-    return rel
+    return encode_target(posixpath.relpath(target, here))
+
+
+ALREADY_ENCODED = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
+def encode_target(target: str) -> str:
+    """Percent-encode a link destination (CommonMark §6.6 / RFC 3986).
+
+    A filename in a non-Latin script, or one containing a space, is not a legal
+    link destination as-is. Encoding is skipped for external URLs and for a
+    target that already carries an escape, so nothing is encoded twice.
+    """
+    if "://" in target or target.startswith("mailto:"):
+        return target
+    if ALREADY_ENCODED.search(target):
+        return target
+    return urllib.parse.quote(target, safe="/._-~")
 
 
 def build_body(spec: dict[str, Any]) -> str:
@@ -239,8 +279,9 @@ def validate(spec: dict[str, Any]) -> tuple[Path, str]:
     if not (spec.get("title") or spec.get("slug")):
         raise ValueError("one of `title` or `slug` is required")
 
-    slug = slugify(spec.get("slug") or spec["title"])
-    if slug in RESERVED:
+    explicit = spec.get("slug")
+    slug = clean_explicit_slug(explicit) if explicit else slugify(spec["title"])
+    if slug.lower() in RESERVED:
         raise ValueError(f"`{slug}.md` is a reserved OKF filename and cannot be a node")
 
     subdir = (spec.get("subdir") or "").strip("/")

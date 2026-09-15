@@ -10,6 +10,11 @@ list of strings is not a source list — the validator parses it to nothing and
 checks no entry, so provenance written that way is invisible to every consumer
 that looks for it. `okf_node.py` wraps plain strings for you.
 
+Filenames are prose too: a graph viewer labels each node with its filename, so a
+bundle written in one language should be named in that language. Pass `slug`
+explicitly for that (`워크트리-주인-하나`); the default ASCII slug of the title is
+only right for an English bundle.
+
 Links are written **file-relative** — `../concepts/x.md` from a sibling
 directory, `x.md` within the same one. OKF v0.2 §6.1 resolves both that form
 and the root-relative `/concepts/x.md`, but Obsidian's graph view resolves only
