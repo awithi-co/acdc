@@ -22,6 +22,12 @@ Input (stdin, JSON object):
       "extra":    {"tags": ["okf"]}        # optional extra frontmatter fields
     }
 
+A link target may be given root-relative (`/decisions/other.md`) or already
+file-relative; either way it is written file-relative to this node's own
+directory. OKF v0.2 §6.1 resolves both forms, but Obsidian's graph view
+resolves only the file-relative one, so a bundle written with root-relative
+links loses every edge when opened there.
+
 Output: the written path on stdout. Exit 1 on a bad spec.
 
 Pure standard library.
@@ -31,6 +37,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import posixpath
 import re
 import sys
 import unicodedata
@@ -99,6 +106,21 @@ def build_frontmatter(spec: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def relative_target(target: str, subdir: str) -> str:
+    """Rewrite a root-relative link target as one relative to the node's own dir.
+
+    OKF v0.2 §6.1 accepts both forms, but Obsidian's graph view resolves only
+    the file-relative one — a bundle written with `/dir/x.md` links opens there
+    with every edge missing. Targets that are already relative, or that point
+    outside the bundle (external URLs, anchors), are returned untouched.
+    """
+    if not target.startswith("/"):
+        return target
+    here = "/" + subdir.strip("/") if subdir.strip("/") else "/"
+    rel = posixpath.relpath(target, here)
+    return rel
+
+
 def build_body(spec: dict[str, Any]) -> str:
     parts = []
     title = spec.get("title")
@@ -109,6 +131,7 @@ def build_body(spec: dict[str, Any]) -> str:
         parts.append(body)
     links = spec.get("links") or []
     if links:
+        subdir = (spec.get("subdir") or "").strip("/")
         rendered = []
         for link in links:
             if isinstance(link, str):
@@ -118,7 +141,7 @@ def build_body(spec: dict[str, Any]) -> str:
                 text = link.get("text") or target
             if not target:
                 continue
-            rendered.append(f"- [{text}]({target})")
+            rendered.append(f"- [{text}]({relative_target(target, subdir)})")
         if rendered:
             parts.append("## Related\n\n" + "\n".join(rendered))
     return "\n\n".join(parts)

@@ -50,9 +50,12 @@ status: draft
 ```
 
    - Filenames are lowercase kebab-case and end in `.md`.
-   - Link related documents with `.md` links in the body. A leading `/` resolves
-     from the bundle root; anything else resolves relative to the linking file.
-     A link is the edge — a document nothing links to is an orphan.
+   - Link related documents with `.md` links in the body. A link is the edge —
+     a document nothing links to is an orphan.
+   - **Write links file-relative** (`../concepts/x.md`, or `x.md` within the
+     same directory). OKF v0.2 §6.1 also resolves a leading `/` from the bundle
+     root, but Obsidian's graph view resolves only the file-relative form, so
+     a bundle written the other way opens there with every edge missing.
    - **Never put frontmatter on a non-root `index.md` or on any `log.md`.**
      Those are reserved files: an index is a listing, not a concept. Frontmatter
      there is a hard conformance error (M4). Only the bundle-root `index.md` may
@@ -72,6 +75,10 @@ status: draft
      index that does not list a sibling. Fix the ones your change caused.
    - Requires `node` on PATH. The validator is vendored under `scripts/vendor/`;
      nothing is downloaded and nothing leaves the machine.
+   - `--graph` writes `<bundle>/okf-graph.html`. Report the path; do not open
+     it unless the user asks. If they do: `xdg-open` on Linux, `open` on macOS,
+     `explorer.exe "$(wslpath -w <path>)"` under WSL — or a browser-devtools
+     tool where one is available, which can also read back what rendered.
 
 5. Report what you wrote, the links you added, and the validator summary
    (concept count, errors, warnings). Do not claim conformance you did not run.

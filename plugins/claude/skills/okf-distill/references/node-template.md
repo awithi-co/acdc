@@ -3,6 +3,14 @@
 One example per node type. A distilled node is short on purpose: body ≤ 25
 lines. If it needs more, it is two nodes.
 
+Links are written **file-relative** — `../concepts/x.md` from a sibling
+directory, `x.md` within the same one. OKF v0.2 §6.1 resolves both that form
+and the root-relative `/concepts/x.md`, but Obsidian's graph view resolves only
+the file-relative one, so a bundle written the other way opens there with every
+edge missing. `okf_node.py` accepts either form in the JSON spec and converts on
+write, so a spec can keep using the root-relative form it finds easier to
+reason about.
+
 The rule that governs all three: **a node records a decision, a lesson, or a
 definition — never a current state.** "The migration is half done" is stale the
 day after it is written. "We split the migration in two because the index
@@ -43,7 +51,7 @@ know about. Upstreaming them retires this node.
 
 ## Related
 
-- [Two validator patches](/concepts/validator-patches.md)
+- [Two validator patches](../concepts/validator-patches.md)
 ```
 
 ---
@@ -104,5 +112,5 @@ none.
 
 ## Related
 
-- [Where the bundle root is recorded](/concepts/acdc-okf-json.md)
+- [Where the bundle root is recorded](acdc-okf-json.md)
 ```

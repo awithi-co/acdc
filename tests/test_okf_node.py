@@ -31,6 +31,33 @@ class SlugTests(unittest.TestCase):
         self.assertLessEqual(len(okf_node.slugify("word " * 100)), 80)
 
 
+class RelativeTargetTests(unittest.TestCase):
+    """Links are written file-relative: OKF resolves both forms, Obsidian one."""
+
+    def test_root_relative_to_sibling_directory(self):
+        self.assertEqual(
+            okf_node.relative_target("/concepts/acp.md", "decisions"),
+            "../concepts/acp.md",
+        )
+
+    def test_root_relative_within_the_same_directory(self):
+        self.assertEqual(okf_node.relative_target("/decisions/b.md", "decisions"), "b.md")
+
+    def test_root_relative_from_the_bundle_root(self):
+        self.assertEqual(okf_node.relative_target("/a.md", ""), "a.md")
+
+    def test_root_relative_up_to_the_bundle_root(self):
+        self.assertEqual(okf_node.relative_target("/index.md", "concepts"), "../index.md")
+
+    def test_nested_subdirectory(self):
+        self.assertEqual(okf_node.relative_target("/a/b/c.md", "a/x"), "../b/c.md")
+
+    def test_already_relative_targets_are_left_alone(self):
+        for target in ("b.md", "../x/y.md", "./c.md", "https://example.org/z.md"):
+            with self.subTest(target=target):
+                self.assertEqual(okf_node.relative_target(target, "decisions"), target)
+
+
 class WriteNodeTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -66,7 +93,7 @@ class WriteNodeTests(unittest.TestCase):
         text = self.write().read_text(encoding="utf-8")
         self.assertIn("# Vendor the validator", text)
         self.assertIn("**Decision.** Ship a copy.", text)
-        self.assertIn("- [Bundle root](/concepts/bundle-root.md)", text)
+        self.assertIn("- [Bundle root](../concepts/bundle-root.md)", text)
 
     def test_distilled_at_defaults_to_today(self):
         text = self.write(distilled_at=None).read_text(encoding="utf-8")
@@ -103,6 +130,19 @@ class WriteNodeTests(unittest.TestCase):
     def test_subdir_is_optional(self):
         path = self.write(subdir=None)
         self.assertEqual(path.parent, self.bundle)
+
+    def test_no_written_link_is_root_relative(self):
+        text = self.write(
+            links=[
+                {"text": "Sibling", "target": "/decisions/other.md"},
+                {"text": "Cousin", "target": "/concepts/x.md"},
+                {"text": "Index", "target": "/index.md"},
+            ]
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("](/", text)
+        self.assertIn("- [Sibling](other.md)", text)
+        self.assertIn("- [Cousin](../concepts/x.md)", text)
+        self.assertIn("- [Index](../index.md)", text)
 
     def test_cli_reads_json_from_stdin(self):
         spec = {

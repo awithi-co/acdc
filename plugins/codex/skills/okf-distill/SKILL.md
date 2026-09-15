@@ -95,6 +95,11 @@ echo '{
      kebab-case slug filename; it refuses reserved names (`index`, `log`).
    - Link nodes to each other and to documents that already exist in the
      bundle. An unlinked node is an orphan the graph cannot reach.
+   - Links are written **file-relative** (`../concepts/x.md`, or `x.md` within
+     the same directory), so both OKF and Obsidian resolve them — Obsidian's
+     graph view ignores the root-relative `/concepts/x.md` form and would show
+     the bundle with no edges at all. The helper accepts either form in the
+     spec and converts on write; hand-written links must be relative.
 
 7. Update the bundle's `index.md` listing so each new node is linked from its
    directory's index. **Non-root `index.md` and `log.md` must carry no
@@ -109,6 +114,18 @@ echo '{
 
    - Requires `node` on PATH. Fix every error before reporting; fix the
      warnings your own nodes caused.
+   - Report the path to `okf-graph.html`. Do not open it — it is a side effect
+     of validation, not something the user asked to look at. Open it only if
+     they ask:
+
+```bash
+xdg-open <bundle>/okf-graph.html            # Linux
+open <bundle>/okf-graph.html                # macOS
+explorer.exe "$(wslpath -w <bundle>/okf-graph.html)"   # WSL
+```
+
+     Under WSL, a browser-devtools tool is the better choice when one is
+     available, since it can also read back what rendered.
 
 9. Report: the node titles grouped by type, the validator summary (concepts,
    errors, warnings), the path to `okf-graph.html`, and anything you dropped
