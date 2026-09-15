@@ -1,0 +1,26 @@
+Vendored third-party code
+=========================
+
+okf-validate.mjs, okf-graph.mjs
+  Source:  https://github.com/Sudhakaran88/okf-conformance
+  License: MIT — Copyright (c) 2026 WitsCode (see LICENSE in this directory)
+
+These are the Open Knowledge Format (OKF) v0.2 conformance validator and graph
+renderer from the okf-conformance project, vendored so that `okf_check.sh` runs
+without a network fetch or a separate install.
+
+Two local modifications are applied on top of the upstream files. Both live in
+the shared `extractLinks` / `stripCode` helpers of each file:
+
+1. Percent-decoding of link destinations. CommonMark §6.6 (RFC 3986) allows a
+   link to a file named `a b.md` to be written `a%20b.md`. Upstream resolved
+   the raw destination against the filesystem, so every filename containing a
+   space read as a broken link.
+
+2. Ignoring links inside fenced code blocks and code spans. Documentation about
+   markdown embeds example links in fences constantly; counting those produced
+   phantom unresolved-link warnings. `stripCode()` blanks code regions (keeping
+   line count and length) before link extraction.
+
+Both changes keep the upstream conformance fixtures passing. They are candidates
+for an upstream pull request; until one lands, they are carried here.

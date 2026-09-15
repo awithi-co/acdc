@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write OKF documents"
+  short_description: "Author and validate Open Knowledge Format documents"
+  default_prompt: "Use $okf-write to add or fix a document in the OKF knowledge bundle and validate it."
