@@ -1,0 +1,137 @@
+"""okf_node.py writes node files an OKF validator will accept."""
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).parent.parent
+SCRIPT = REPO_ROOT / "plugins/claude/skills/okf-distill/scripts/okf_node.py"
+
+sys.path.insert(0, str(SCRIPT.parent))
+
+import okf_node  # noqa: E402
+
+
+class SlugTests(unittest.TestCase):
+    def test_kebab_case_ascii(self):
+        self.assertEqual(okf_node.slugify("Vendor the OKF Validator!"), "vendor-the-okf-validator")
+
+    def test_collapses_and_trims_separators(self):
+        self.assertEqual(okf_node.slugify("  a --  b // c  "), "a-b-c")
+
+    def test_non_ascii_title_still_yields_a_filename(self):
+        slug = okf_node.slugify("지식 그래프")
+        self.assertTrue(slug)
+        self.assertRegex(slug, r"^[a-z0-9-]+$")
+
+    def test_length_is_bounded(self):
+        self.assertLessEqual(len(okf_node.slugify("word " * 100)), 80)
+
+
+class WriteNodeTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.bundle = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def write(self, **overrides):
+        spec = {
+            "bundle": str(self.bundle),
+            "subdir": "decisions",
+            "type": "Decision",
+            "title": "Vendor the validator",
+            "sources": ["SHARE-260916", "019dc08e"],
+            "distilled_at": "2026-09-16",
+            "body": "**Decision.** Ship a copy.",
+            "links": [{"text": "Bundle root", "target": "/concepts/bundle-root.md"}],
+        }
+        spec.update(overrides)
+        return okf_node.write_node(spec)
+
+    def test_path_and_frontmatter(self):
+        path = self.write()
+        self.assertEqual(path, self.bundle / "decisions" / "vendor-the-validator.md")
+        text = path.read_text(encoding="utf-8")
+        head, _, _body = text.partition("\n---\n")
+        self.assertTrue(text.startswith("---\n"))
+        self.assertIn('type: "Decision"', head)
+        self.assertIn('status: "draft"', head)
+        self.assertIn('sources: ["SHARE-260916", "019dc08e"]', head)
+        self.assertIn('distilled_at: "2026-09-16"', head)
+
+    def test_body_carries_heading_and_links(self):
+        text = self.write().read_text(encoding="utf-8")
+        self.assertIn("# Vendor the validator", text)
+        self.assertIn("**Decision.** Ship a copy.", text)
+        self.assertIn("- [Bundle root](/concepts/bundle-root.md)", text)
+
+    def test_distilled_at_defaults_to_today(self):
+        text = self.write(distilled_at=None).read_text(encoding="utf-8")
+        import datetime as dt
+
+        self.assertIn(f'distilled_at: "{dt.date.today().isoformat()}"', text)
+
+    def test_colon_in_title_is_quoted(self):
+        """An unquoted `a: b` in frontmatter is a YAML mapping, not a title."""
+        text = self.write(title="Retry: only on 5xx").read_text(encoding="utf-8")
+        self.assertIn('title: "Retry: only on 5xx"', text)
+
+    def test_reserved_filenames_are_refused(self):
+        # M4: index.md / log.md must carry no frontmatter, so a node can never be one.
+        for reserved in ("index", "Log"):
+            with self.subTest(slug=reserved):
+                with self.assertRaises(ValueError):
+                    self.write(slug=reserved)
+
+    def test_unknown_type_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.write(type="State")
+
+    def test_unknown_status_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.write(status="wip")
+
+    def test_extra_fields_do_not_override_managed_ones(self):
+        text = self.write(extra={"tags": ["okf", "acdc"], "status": "stable"}).read_text()
+        self.assertIn('tags: ["okf", "acdc"]', text)
+        self.assertIn('status: "draft"', text)
+        self.assertNotIn('status: "stable"', text)
+
+    def test_subdir_is_optional(self):
+        path = self.write(subdir=None)
+        self.assertEqual(path.parent, self.bundle)
+
+    def test_cli_reads_json_from_stdin(self):
+        spec = {
+            "bundle": str(self.bundle),
+            "type": "Lesson",
+            "title": "Distil decisions, never state",
+            "body": "**Rule.** ...",
+        }
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)],
+            input=json.dumps(spec),
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        written = Path(result.stdout.strip())
+        self.assertTrue(written.is_file())
+        self.assertIn('type: "Lesson"', written.read_text(encoding="utf-8"))
+
+    def test_cli_rejects_bad_spec_without_traceback(self):
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)],
+            input='{"bundle": "x"}',
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("Traceback", result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
