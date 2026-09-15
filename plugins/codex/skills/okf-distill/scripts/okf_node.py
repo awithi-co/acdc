@@ -55,6 +55,7 @@ Pure standard library.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import posixpath
 import re
@@ -112,8 +113,10 @@ def slugify(text: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_only).strip("-").lower()
     slug = re.sub(r"-{2,}", "-", slug)
     if not slug:
-        # A title with no ASCII at all (e.g. all Hangul) still needs a filename.
-        slug = "node-" + re.sub(r"[^0-9a-f]", "", hex(abs(hash(text))))[:8]
+        # A title with no ASCII at all (e.g. all Hangul) still needs a filename,
+        # and the same one on every run: str hash() is salted per process, so a
+        # re-distilled node would land beside itself instead of replacing itself.
+        slug = "node-" + hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
     return slug[:80].strip("-")
 
 
@@ -236,13 +239,16 @@ def encode_target(target: str) -> str:
 
     A filename in a non-Latin script, or one containing a space, is not a legal
     link destination as-is. Encoding is skipped for external URLs and for a
-    target that already carries an escape, so nothing is encoded twice.
+    target that already carries an escape, so nothing is encoded twice. A
+    `#fragment` stays a fragment: encoding its `#` would make it part of the
+    filename.
     """
     if "://" in target or target.startswith("mailto:"):
         return target
-    if ALREADY_ENCODED.search(target):
+    path, hash_mark, fragment = target.partition("#")
+    if ALREADY_ENCODED.search(path):
         return target
-    return urllib.parse.quote(target, safe="/._-~")
+    return urllib.parse.quote(path, safe="/._-~") + hash_mark + urllib.parse.quote(fragment, safe="._-~")
 
 
 def build_body(spec: dict[str, Any]) -> str:

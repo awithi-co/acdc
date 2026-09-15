@@ -26,6 +26,8 @@ class SlugTests(unittest.TestCase):
         slug = okf_node.slugify("지식 그래프")
         self.assertTrue(slug)
         self.assertRegex(slug, r"^[a-z0-9-]+$")
+        # Pinned literally: the fallback must not change between processes.
+        self.assertEqual(slug, "node-4576a5da")
 
     def test_length_is_bounded(self):
         self.assertLessEqual(len(okf_node.slugify("word " * 100)), 80)
@@ -42,6 +44,7 @@ class RelativeTargetTests(unittest.TestCase):
 
     def test_root_relative_within_the_same_directory(self):
         self.assertEqual(okf_node.relative_target("/decisions/b.md", "decisions"), "b.md")
+        self.assertEqual(okf_node.relative_target("/decisions/b.md#why", "decisions"), "b.md#why")
 
     def test_root_relative_from_the_bundle_root(self):
         self.assertEqual(okf_node.relative_target("/a.md", ""), "a.md")
@@ -53,7 +56,7 @@ class RelativeTargetTests(unittest.TestCase):
         self.assertEqual(okf_node.relative_target("/a/b/c.md", "a/x"), "../b/c.md")
 
     def test_already_relative_targets_are_left_alone(self):
-        for target in ("b.md", "../x/y.md", "./c.md", "https://example.org/z.md"):
+        for target in ("b.md", "../x/y.md", "./c.md", "https://example.org/z.md", "b.md#why", "#top"):
             with self.subTest(target=target):
                 self.assertEqual(okf_node.relative_target(target, "decisions"), target)
 
@@ -86,6 +89,7 @@ class EncodeTargetTests(unittest.TestCase):
             okf_node.encode_target("../lessons/워크트리-주인-하나.md"),
             "../lessons/%EC%9B%8C%ED%81%AC%ED%8A%B8%EB%A6%AC-%EC%A3%BC%EC%9D%B8-%ED%95%98%EB%82%98.md",
         )
+        self.assertEqual(okf_node.encode_target("거울.md#사본"), "%EA%B1%B0%EC%9A%B8.md#%EC%82%AC%EB%B3%B8")
 
     def test_a_space_is_encoded(self):
         self.assertEqual(okf_node.encode_target("a b.md"), "a%20b.md")
