@@ -17,8 +17,10 @@ Input (stdin, JSON object):
       "title":    "Vendor the OKF validator",
       "slug":     "vendor-okf-validator",  # optional, derived from title
       "status":   "draft",                 # optional, default "draft"
-      "sources":  ["SHARE-260916"],        # session names or ids
-      "distilled_at": "2026-09-16",        # optional, default: today
+      "agent":    "claude",                # claude | codex; the source URI scheme
+      "sources":  ["SHARE-260916"],        # strings, or {resource, id, title} dicts
+      "generated_at": "2026-09-16T21:00:00+09:00",   # optional, default: now
+      "generated_by": "acdc okf-distill",  # optional
       "body":     "markdown body",
       "links":    [{"text": "Why", "target": "/decisions/other.md"}],
       "related_heading": "Related",        # optional, heading above the links
@@ -58,6 +60,14 @@ from typing import Any
 ROLES = ("decision", "lesson", "concept")
 DEFAULT_TYPES = {"Decision": "decision", "Lesson": "lesson", "Concept": "concept"}
 STATUSES = ("draft", "stable", "deprecated")
+
+# OKF v0.2 §5.1/§5.2 name the provenance fields: `sources` is a list of entries
+# each REQUIRING `resource` (a URI), and `generated` carries `by` and an ISO 8601
+# `at`. A bare list of strings parses to nothing — the validator reads it as an
+# empty list and silently checks no entry — so provenance written that way is
+# invisible to every consumer that looks for it.
+SOURCE_SCHEMES = {"claude": "claude-session", "codex": "codex-session"}
+DEFAULT_GENERATED_BY = "acdc okf-distill"
 
 # Reserved OKF filenames: an index.md or log.md must never carry frontmatter
 # (spec §8/§9, validator rule M4), so a node may never be written to one.
@@ -102,22 +112,67 @@ def build_frontmatter(spec: dict[str, Any]) -> str:
     title = spec.get("title")
     if title:
         fields["title"] = title
-    sources = spec.get("sources") or []
-    if isinstance(sources, str):
-        sources = [sources]
-    fields["sources"] = list(sources)
-    fields["distilled_at"] = spec.get("distilled_at") or dt.date.today().isoformat()
     for key, value in (spec.get("extra") or {}).items():
-        if key in ("type", "status", "sources", "distilled_at"):
-            continue  # the managed fields above win
+        if key in ("type", "status", "sources", "generated"):
+            continue  # the managed fields win
         fields[key] = value
     # `role` is an instruction to this helper, not bundle metadata: the bundle's
     # own vocabulary lives in `type`.
 
     lines = ["---"]
     lines += [f"{key}: {yaml_value(value)}" for key, value in fields.items()]
+    lines += render_sources(spec)
+    lines.append(render_generated(spec))
     lines.append("---")
     return "\n".join(lines)
+
+
+def normalize_sources(spec: dict[str, Any]) -> list[dict[str, str]]:
+    """Wrap bare session identifiers as §5.1 entries; pass dicts through.
+
+    A string is all the agent usually has, and a session is not a URL, so it
+    becomes a `claude-session://` (or `codex-session://`) URI. Nothing is
+    invented beyond that: `id` and `title` appear only when the spec supplies
+    them as a dict.
+    """
+    raw = spec.get("sources") or []
+    if isinstance(raw, (str, dict)):
+        raw = [raw]
+    agent = (spec.get("agent") or "claude").lower()
+    scheme = SOURCE_SCHEMES.get(agent)
+    if scheme is None:
+        raise ValueError(f"`agent` must be one of {', '.join(SOURCE_SCHEMES)}, got {agent!r}")
+
+    entries: list[dict[str, str]] = []
+    for item in raw:
+        if isinstance(item, dict):
+            if not item.get("resource"):
+                raise ValueError("each `sources` entry requires `resource` (OKF v0.2 §5.1)")
+            entries.append({str(k): str(v) for k, v in item.items()})
+        else:
+            entries.append({"resource": f"{scheme}://{item}", "title": str(item)})
+    return entries
+
+
+def render_sources(spec: dict[str, Any]) -> list[str]:
+    """Block-sequence form. Inline `{…}` would break on a comma in a title."""
+    entries = normalize_sources(spec)
+    if not entries:
+        return []
+    lines = ["sources:"]
+    for entry in entries:
+        keys = ["resource"] + [k for k in entry if k != "resource"]
+        for position, key in enumerate(keys):
+            prefix = "  - " if position == 0 else "    "
+            lines.append(f"{prefix}{key}: {yaml_scalar(entry[key])}")
+    return lines
+
+
+def render_generated(spec: dict[str, Any]) -> str:
+    """§5.2 `generated: { by, at }`. `at` is ISO 8601 including the offset."""
+    by = spec.get("generated_by") or DEFAULT_GENERATED_BY
+    at = spec.get("generated_at") or dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    return f"generated: {{ by: {yaml_scalar(by)}, at: {yaml_scalar(at)} }}"
 
 
 def relative_target(target: str, subdir: str) -> str:

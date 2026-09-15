@@ -37,6 +37,10 @@ Recall is continuity within a session's lifetime. Some of what a session produce
 
 There is deliberately no "current state" node. A record of where the work stands is false within days; the decision that produced it stays true. `okf-distill` rewrites such candidates as the decision behind them, or drops them.
 
+**Provenance.** Each node records where it came from, in the fields OKF v0.2 §5 names: `sources` entries carrying a required `resource` URI — a session becomes `claude-session://<name-or-id>` or `codex-session://<name-or-id>` — and `generated: { by, at }`. `okf_node.py` writes both, so a node can always be traced back to the session it came from.
+
+**Names.** The three roles are fixed; their names follow the bundle. A knowledge base that already calls its lessons `Finding` keeps doing so — the skill reads the existing documents first and only an empty bundle gets the default `Decision` / `Lesson` / `Concept`. Links are written file-relative so that Obsidian's graph view resolves them too; OKF accepts both forms, Obsidian only that one.
+
 **Where the bundle lives.** `.acdc/okf.json` at the repo root holds one key:
 
 ```json

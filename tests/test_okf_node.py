@@ -71,7 +71,7 @@ class WriteNodeTests(unittest.TestCase):
             "type": "Decision",
             "title": "Vendor the validator",
             "sources": ["SHARE-260916", "019dc08e"],
-            "distilled_at": "2026-09-16",
+            "generated_at": "2026-09-16T21:00:00+09:00",
             "body": "**Decision.** Ship a copy.",
             "links": [{"text": "Bundle root", "target": "/concepts/bundle-root.md"}],
         }
@@ -86,8 +86,15 @@ class WriteNodeTests(unittest.TestCase):
         self.assertTrue(text.startswith("---\n"))
         self.assertIn('type: "Decision"', head)
         self.assertIn('status: "draft"', head)
-        self.assertIn('sources: ["SHARE-260916", "019dc08e"]', head)
-        self.assertIn('distilled_at: "2026-09-16"', head)
+        # OKF v0.2 §5.1: a source entry REQUIRES `resource`, a URI. A bare list
+        # of strings parses to an empty list, so the validator checks nothing.
+        self.assertIn('sources:\n', head)
+        self.assertIn('  - resource: "claude-session://SHARE-260916"', head)
+        self.assertIn('  - resource: "claude-session://019dc08e"', head)
+        self.assertNotIn('sources: [', head)
+        # §5.2
+        self.assertIn('generated: { by: "acdc okf-distill", at: "2026-09-16T21:00:00+09:00" }', head)
+        self.assertNotIn("distilled_at", head)
 
     def test_body_carries_heading_and_links(self):
         text = self.write().read_text(encoding="utf-8")
@@ -95,11 +102,43 @@ class WriteNodeTests(unittest.TestCase):
         self.assertIn("**Decision.** Ship a copy.", text)
         self.assertIn("- [Bundle root](../concepts/bundle-root.md)", text)
 
-    def test_distilled_at_defaults_to_today(self):
-        text = self.write(distilled_at=None).read_text(encoding="utf-8")
+    def test_generated_at_defaults_to_an_iso_timestamp_with_offset(self):
         import datetime as dt
+        import re
 
-        self.assertIn(f'distilled_at: "{dt.date.today().isoformat()}"', text)
+        text = self.write(generated_at=None).read_text(encoding="utf-8")
+        stamp = re.search(r'at: "([^"]+)"', text).group(1)
+        parsed = dt.datetime.fromisoformat(stamp)
+        self.assertIsNotNone(parsed.tzinfo, "an ISO 8601 instant carries its offset")
+        self.assertEqual(parsed.date(), dt.date.today())
+
+    def test_codex_sessions_get_their_own_uri_scheme(self):
+        text = self.write(agent="codex", sources=["019dc08e"]).read_text(encoding="utf-8")
+        self.assertIn('resource: "codex-session://019dc08e"', text)
+
+    def test_unknown_agent_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.write(agent="gemini")
+
+    def test_a_source_dict_passes_through_and_leads_with_resource(self):
+        text = self.write(
+            sources=[{"title": "SHARE-260916", "id": "ce49daed", "resource": "claude-session://x"}]
+        ).read_text(encoding="utf-8")
+        block = text.split("sources:\n", 1)[1]
+        self.assertTrue(block.startswith('  - resource: "claude-session://x"\n'))
+        self.assertIn('    id: "ce49daed"', block)
+        self.assertIn('    title: "SHARE-260916"', block)
+
+    def test_a_source_dict_without_resource_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.write(sources=[{"title": "no uri"}])
+
+    def test_a_comma_in_a_source_title_survives(self):
+        """Inline `{a: 1, b: 2}` would split on that comma; block form does not."""
+        text = self.write(
+            sources=[{"resource": "claude-session://x", "title": "one, two"}]
+        ).read_text(encoding="utf-8")
+        self.assertIn('    title: "one, two"', text)
 
     def test_colon_in_title_is_quoted(self):
         """An unquoted `a: b` in frontmatter is a YAML mapping, not a title."""

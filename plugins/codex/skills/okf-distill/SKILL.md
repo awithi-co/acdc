@@ -101,14 +101,20 @@ echo '{
   "subdir": "decisions",
   "type": "Decision",
   "title": "Vendor the OKF validator instead of depending on it",
+  "agent": "claude",
   "sources": ["<session-name-or-id>"],
   "body": "**Decision.** ...\n\n**Why.** ...\n\n**Rejected.** ...",
   "links": [{"text": "Bundle root", "target": "/concepts/bundle-root.md"}]
 }' | uv run python <skill-dir>/scripts/okf_node.py
 ```
 
-   - The helper sets `type`, `status: draft`, `sources`, `distilled_at`, and a
-     kebab-case slug filename; it refuses reserved names (`index`, `log`).
+   - The helper sets `type`, `status: draft`, a kebab-case slug filename, and
+     the OKF v0.2 §5 provenance fields: `sources` entries carrying a required
+     `resource` URI (`claude-session://…` / `codex-session://…`, from `agent`)
+     and `generated: { by, at }`. Pass session identifiers as plain strings and
+     it wraps them; a bare string list written by hand is not a source list and
+     the validator checks nothing in it. It refuses reserved names
+     (`index`, `log`).
    - Link nodes to each other and to documents that already exist in the
      bundle. An unlinked node is an orphan the graph cannot reach.
    - Links are written **file-relative** (`../concepts/x.md`, or `x.md` within

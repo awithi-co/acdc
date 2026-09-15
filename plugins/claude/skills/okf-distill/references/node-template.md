@@ -3,6 +3,13 @@
 One example per node type. A distilled node is short on purpose: body ≤ 25
 lines. If it needs more, it is two nodes.
 
+Provenance follows OKF v0.2 §5: `sources` is a list of entries each carrying a
+required `resource` URI (a session becomes `claude-session://<name-or-id>`, or
+`codex-session://`), and `generated` carries `by` and an ISO 8601 `at`. A bare
+list of strings is not a source list — the validator parses it to nothing and
+checks no entry, so provenance written that way is invisible to every consumer
+that looks for it. `okf_node.py` wraps plain strings for you.
+
 Links are written **file-relative** — `../concepts/x.md` from a sibling
 directory, `x.md` within the same one. OKF v0.2 §6.1 resolves both that form
 and the root-relative `/concepts/x.md`, but Obsidian's graph view resolves only
@@ -28,8 +35,10 @@ the node cannot stop the same debate from restarting.
 type: "Decision"
 status: "draft"
 title: "Vendor the OKF validator instead of depending on it"
-sources: ["SHARE-260916"]
-distilled_at: "2026-09-16"
+sources:
+  - resource: "claude-session://SHARE-260916"
+    title: "SHARE-260916"
+generated: { by: "acdc okf-distill", at: "2026-09-16T21:00:00+09:00" }
 ---
 
 # Vendor the OKF validator instead of depending on it
@@ -66,8 +75,10 @@ opinion, and the next reader will re-litigate it.
 type: "Lesson"
 status: "draft"
 title: "Distil decisions, never current state"
-sources: ["SHARE-260916"]
-distilled_at: "2026-09-16"
+sources:
+  - resource: "claude-session://SHARE-260916"
+    title: "SHARE-260916"
+generated: { by: "acdc okf-distill", at: "2026-09-16T21:00:00+09:00" }
 ---
 
 # Distil decisions, never current state
@@ -96,8 +107,10 @@ the word the same way.
 type: "Concept"
 status: "draft"
 title: "Bundle root"
-sources: ["SHARE-260916"]
-distilled_at: "2026-09-16"
+sources:
+  - resource: "claude-session://SHARE-260916"
+    title: "SHARE-260916"
+generated: { by: "acdc okf-distill", at: "2026-09-16T21:00:00+09:00" }
 ---
 
 # Bundle root
