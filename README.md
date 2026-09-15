@@ -16,7 +16,38 @@ ACDC reads your local Claude Code and Codex sessions to put the context back whe
 | `recall-session` | Self-recall: look up your own past session by name or UUID. Returns a timeline summary — what you decided, what changed, where you left off. | "show me yesterday's api-refactor session" |
 | `recall-context` | Topic search: find where you discussed something across your sessions, even pre-compaction in the current one. | "where did we decide on the ACDC name" |
 
-Three skills per agent, each plugin self-contained.
+Five skills per agent, each plugin self-contained.
+
+## Knowledge: OKF
+
+Recall is continuity within a session's lifetime. Some of what a session produces should outlive it — the choice you made and the two you rejected, the rule an incident earned, the term the work defined. Two skills write those into an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) (OKF) v0.2 bundle: a directory of markdown files whose frontmatter is the metadata and whose `.md` links are the graph edges.
+
+| Skill | What it does | Example invocation |
+|-------|--------------|--------------------|
+| `okf-write` | Author or fix one document as OKF, then validate the bundle. | "add a doc about the retry policy to the knowledge base" |
+| `okf-distill` | Read finished Claude Code and Codex sessions and write what should outlive them as nodes. | "distill the api-refactor session into the knowledge base" |
+
+**Node types — three, and no fourth.**
+
+| Type | Records | Must contain |
+|------|---------|--------------|
+| `Decision` | A choice the work made | what was decided, why, which alternatives were rejected |
+| `Lesson` | A rule the work earned | the rule, and the incident that proves it |
+| `Concept` | A thing or term the work defined | the definition, and why it matters |
+
+There is deliberately no "current state" node. A record of where the work stands is false within days; the decision that produced it stays true. `okf-distill` rewrites such candidates as the decision behind them, or drops them.
+
+**Where the bundle lives.** `.acdc/okf.json` at the repo root holds one key:
+
+```json
+{"bundle": "docs/knowledge"}
+```
+
+Both skills read it, and write it once (after asking) when it is missing.
+
+**Validation.** `okf-write/scripts/okf_check.sh <bundle> [--strict] [--graph]` runs a vendored copy of the [okf-conformance](https://github.com/Sudhakaran88/okf-conformance) validator (MIT © WitsCode, `scripts/vendor/`), so nothing is downloaded and nothing leaves the machine. It requires `node`; the rest of ACDC does not. The bundle's file set comes from git when the bundle sits in a repository, so ignored and local-only files are never counted. `--graph` writes `<bundle>/okf-graph.html`, a self-contained interactive view.
+
+`okf-distill` reads transcripts, which are not sanitized. The skill strips hostnames, addresses, personal names, internal URLs and credentials before writing a node, and drops a node it cannot write without one — but a bundle you intend to publish deserves a read-through.
 
 ## Install
 
@@ -90,6 +121,8 @@ history.jsonl                                          per-prompt log
 ## Requirements
 
 Python 3 on PATH. Pre-installed on macOS 12.3+ and most Linux distributions; on Windows, install from python.org if unavailable. The skill tries `uv run python`, then `python3`, then `python`, and stops with a clear message if none are found.
+
+The OKF bundle checker additionally needs [Node.js](https://nodejs.org) on PATH. Only `okf_check.sh` uses it; the recall and handoff skills do not.
 
 ## Privacy & limitations
 

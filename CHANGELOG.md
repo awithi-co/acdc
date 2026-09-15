@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- **Knowledge continuity: `okf-write` and `okf-distill`.** Recall keeps context
+  alive within a session's lifetime; these two skills write what should outlive
+  it. `okf-write` authors and validates documents in an Open Knowledge Format
+  v0.2 bundle. `okf-distill` reads finished Claude Code and Codex sessions
+  through the existing finders and summarizers and extracts exactly three node
+  types — `Decision`, `Lesson`, `Concept`. There is deliberately no
+  "current state" node: a record of where the work stands is false within days,
+  while the decision that produced it stays true.
+- **Self-contained bundle checker.** `okf_check.sh` vendors the okf-conformance
+  validator and graph renderer (MIT © WitsCode) with two local patches —
+  percent-decoded link destinations, and links inside code fences ignored — so
+  the skill needs only `node`, no second checkout and no network. It scopes the
+  bundle to what git tracks and validates a staged copy, leaving the real bundle
+  untouched apart from `okf-graph.html` under `--graph`.
+- **`.acdc/okf.json`** records the bundle path for a repository, so neither
+  skill has to ask twice.
+
 ## 0.2.0 - 2026-09-15
 
 ### Added
