@@ -308,7 +308,33 @@ function parseFrontmatter(text) {
 // v0.2 §6.1: two forms — absolute bundle-relative (leading `/`, resolved
 // against the bundle root; the recommended form) and relative (resolved
 // against the linking file's directory). External URLs and images skipped.
+// CommonMark: link syntax inside fenced code blocks and code spans is not a
+// link. Documentation about markdown embeds example links in fences constantly,
+// and counting those produces phantom unresolved-link warnings. Blank the code
+// out (preserving line count and length) before extracting.
+function stripCode(body) {
+  const blank = (s) => s.replace(/[^\n]/g, " ");
+  let fence = null;
+  return body
+    .split("\n")
+    .map((line) => {
+      if (fence === null) {
+        const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+        if (open) {
+          fence = open[1];
+          return blank(line);
+        }
+        return line.replace(/`+[^`\n]*`+/g, blank);
+      }
+      const close = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(line);
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      return blank(line);
+    })
+    .join("\n");
+}
+
 function extractLinks(body, fileDir, bundleRoot) {
+  body = stripCode(body);
   const edges = [];
   const unresolved = [];
   const re = /\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
@@ -319,9 +345,15 @@ function extractLinks(body, fileDir, bundleRoot) {
     if (!target) continue;
     if (/^[a-z]+:\/\//i.test(target) || target.startsWith("mailto:")) continue; // external
     if (!target.toLowerCase().endsWith(".md")) continue; // concept edges are .md links
-    const resolved = target.startsWith("/")
-      ? path.join(bundleRoot, target.slice(1))     // bundle-relative (§6.1)
-      : path.resolve(fileDir, target);             // relative
+    // Link destinations are percent-encoded (CommonMark §6.6 / RFC 3986):
+    // a file named `99. AppCard_API.md` is linked as `99.%20AppCard_API.md`.
+    // Decode before touching the filesystem, or every space-bearing filename
+    // reads as a broken link.
+    let decoded = target;
+    try { decoded = decodeURIComponent(target); } catch { /* keep raw */ }
+    const resolved = decoded.startsWith("/")
+      ? path.join(bundleRoot, decoded.slice(1))    // bundle-relative (§6.1)
+      : path.resolve(fileDir, decoded);            // relative
     if (fs.existsSync(resolved)) edges.push(resolved);
     else unresolved.push(target);
   }

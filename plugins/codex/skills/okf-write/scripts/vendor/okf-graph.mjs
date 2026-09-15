@@ -79,7 +79,33 @@ function stripQuotes(s) {
 // ---- extract internal concept links from a markdown body -------------------
 // v0.2 §6.1: a leading `/` is bundle-relative (the recommended form); anything
 // else resolves relative to the linking file's directory.
+// CommonMark: link syntax inside fenced code blocks and code spans is not a
+// link. Documentation about markdown embeds example links in fences constantly,
+// and counting those produces phantom unresolved-link warnings. Blank the code
+// out (preserving line count and length) before extracting.
+function stripCode(body) {
+  const blank = (s) => s.replace(/[^\n]/g, " ");
+  let fence = null;
+  return body
+    .split("\n")
+    .map((line) => {
+      if (fence === null) {
+        const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+        if (open) {
+          fence = open[1];
+          return blank(line);
+        }
+        return line.replace(/`+[^`\n]*`+/g, blank);
+      }
+      const close = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(line);
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      return blank(line);
+    })
+    .join("\n");
+}
+
 function extractLinks(body, fileDir, bundleRoot) {
+  body = stripCode(body);
   const edges = [];
   const unresolved = [];
   const re = /\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
@@ -91,9 +117,13 @@ function extractLinks(body, fileDir, bundleRoot) {
     if (!target) continue;
     if (/^[a-z]+:\/\//i.test(target) || target.startsWith("mailto:")) continue; // external
     if (!target.toLowerCase().endsWith(".md")) continue; // concept edges are .md links
-    const resolved = target.startsWith("/")
-      ? path.join(bundleRoot, target.slice(1))
-      : path.resolve(fileDir, target);
+    // Percent-decode before touching the filesystem (CommonMark §6.6 /
+    // RFC 3986) — otherwise `a%20b.md` never matches the file `a b.md`.
+    let decoded = target;
+    try { decoded = decodeURIComponent(target); } catch { /* keep raw */ }
+    const resolved = decoded.startsWith("/")
+      ? path.join(bundleRoot, decoded.slice(1))
+      : path.resolve(fileDir, decoded);
     if (fs.existsSync(resolved)) edges.push(resolved);
     else unresolved.push(target);
   }
