@@ -87,11 +87,17 @@ def ripgrep_matching_lines(
     ripgrep: str, pattern: str, roots: list[Path]
 ) -> Iterable[tuple[Path, str]] | None:
     """Run ripgrep. Returns None when it could not be executed, so callers can fall back."""
+    # --null ends the path with NUL instead of ":" so Windows drive letters
+    # survive parsing; --with-filename keeps the path when only one file is searched.
     try:
         result = subprocess.run(
-            [ripgrep, "--line-number", "--ignore-case", pattern, *(str(r) for r in roots)],
+            [
+                ripgrep, "--with-filename", "--null", "--line-number", "--ignore-case",
+                pattern, *(str(r) for r in roots),
+            ],
             check=False,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
         )
     except OSError:
@@ -100,9 +106,10 @@ def ripgrep_matching_lines(
         return None
 
     matches: list[tuple[Path, str]] = []
-    for line in result.stdout.splitlines():
+    for line in result.stdout.split("\n"):
         try:
-            raw_path, _line_number, text = line.split(":", 2)
+            raw_path, rest = line.split("\0", 1)
+            _line_number, text = rest.split(":", 1)
         except ValueError:
             continue
         matches.append((Path(raw_path), text))
