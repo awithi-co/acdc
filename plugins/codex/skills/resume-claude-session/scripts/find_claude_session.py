@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -54,6 +55,70 @@ def iter_search_roots(claude_home: Path) -> Iterable[Path]:
             yield path
 
 
+SEARCHABLE_SUFFIXES = {".json", ".jsonl"}
+
+
+def iter_searchable_files(root: Path) -> Iterable[Path]:
+    """Yield the json/jsonl files a ripgrep run over `root` would have visited."""
+    if root.is_file():
+        if root.suffix.lower() in SEARCHABLE_SUFFIXES:
+            yield root
+        return
+    for path in sorted(root.rglob("*")):
+        if path.is_file() and path.suffix.lower() in SEARCHABLE_SUFFIXES:
+            yield path
+
+
+def scan_matching_lines(pattern: str, roots: list[Path]) -> Iterable[tuple[Path, str]]:
+    """Pure-Python stand-in for ripgrep: (path, matching line) over json/jsonl files."""
+    regex = re.compile(pattern, re.IGNORECASE)
+    for root in roots:
+        for path in iter_searchable_files(root):
+            try:
+                with path.open("r", encoding="utf-8", errors="replace") as handle:
+                    for line in handle:
+                        if regex.search(line):
+                            yield path, line.rstrip("\n")
+            except OSError:
+                continue
+
+
+def ripgrep_matching_lines(
+    ripgrep: str, pattern: str, roots: list[Path]
+) -> Iterable[tuple[Path, str]] | None:
+    """Run ripgrep. Returns None when it could not be executed, so callers can fall back."""
+    try:
+        result = subprocess.run(
+            [ripgrep, "--line-number", "--ignore-case", pattern, *(str(r) for r in roots)],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+    except OSError:
+        return None
+    if result.returncode not in (0, 1):
+        return None
+
+    matches: list[tuple[Path, str]] = []
+    for line in result.stdout.splitlines():
+        try:
+            raw_path, _line_number, text = line.split(":", 2)
+        except ValueError:
+            continue
+        matches.append((Path(raw_path), text))
+    return matches
+
+
+def iter_matching_lines(pattern: str, roots: list[Path]) -> Iterable[tuple[Path, str]]:
+    ripgrep = shutil.which("rg")
+    if ripgrep:
+        matches = ripgrep_matching_lines(ripgrep, pattern, roots)
+        if matches is not None:
+            yield from matches
+            return
+    yield from scan_matching_lines(pattern, roots)
+
+
 def iter_matching_records(
     claude_home: Path,
     query: str,
@@ -61,30 +126,14 @@ def iter_matching_records(
 ) -> Iterable[tuple[Path, Any]]:
     escaped_query = re.escape(query)
     pattern = rf'"(name|customTitle|agentName)"\s*:\s*"[^"]*{escaped_query}[^"]*"'
-    roots = [str(path) for path in iter_search_roots(claude_home)]
+    roots = list(iter_search_roots(claude_home))
     if not roots:
-        return
-
-    try:
-        result = subprocess.run(
-            ["rg", "--line-number", "--ignore-case", pattern, *roots],
-            check=False,
-            text=True,
-            capture_output=True,
-        )
-    except OSError:
         return
 
     parsed_json_files: set[Path] = set()
     seen_files: set[Path] = set()
-    for line in result.stdout.splitlines():
-        try:
-            raw_path, _line_number, text = line.split(":", 2)
-        except ValueError:
-            continue
-
-        path = Path(raw_path)
-        if not path.is_file() or path.suffix.lower() not in {".json", ".jsonl"}:
+    for path, text in iter_matching_lines(pattern, roots):
+        if not path.is_file() or path.suffix.lower() not in SEARCHABLE_SUFFIXES:
             continue
 
         seen_files.add(path)
@@ -315,7 +364,7 @@ def main() -> int:
         "--max-project-files",
         type=int,
         default=20,
-        help="Maximum project transcript files to parse after ripgrep narrows them",
+        help="Maximum project transcript files to parse after the name search narrows them",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON array. Useful for jq-piping or extracting a specific field (e.g. transcript_paths) for the next command.")
     args = parser.parse_args()
