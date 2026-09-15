@@ -11,7 +11,9 @@ Input (stdin, JSON object):
     {
       "bundle":   "path/to/bundle",        # required
       "subdir":   "decisions",             # optional, default "" (bundle root)
-      "type":     "Decision",              # required: Decision | Lesson | Concept
+      "type":     "Decision",              # required: the bundle's name for the role
+      "role":     "decision",              # decision | lesson | concept; inferred
+                                          #   when `type` is one of the defaults
       "title":    "Vendor the OKF validator",
       "slug":     "vendor-okf-validator",  # optional, derived from title
       "status":   "draft",                 # optional, default "draft"
@@ -22,6 +24,11 @@ Input (stdin, JSON object):
       "related_heading": "Related",        # optional, heading above the links
       "extra":    {"tags": ["okf"]}        # optional extra frontmatter fields
     }
+
+The three roles are fixed; their names are not. A bundle that already calls its
+lessons `Finding` keeps doing so — pass `type: "Finding"` with `role: "lesson"`.
+`role` is what the no-state-nodes rule is enforced against, so it is required
+whenever `type` is not one of the three default names.
 
 A link target may be given root-relative (`/decisions/other.md`) or already
 file-relative; either way it is written file-relative to this node's own
@@ -45,7 +52,11 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-NODE_TYPES = ("Decision", "Lesson", "Concept")
+# The three roles a distilled node may play. Fixed — this is the rule that keeps
+# "current state" out of a bundle. Their *names* are not fixed: DEFAULT_TYPES is
+# only what an empty bundle gets, and a bundle with its own vocabulary keeps it.
+ROLES = ("decision", "lesson", "concept")
+DEFAULT_TYPES = {"Decision": "decision", "Lesson": "lesson", "Concept": "concept"}
 STATUSES = ("draft", "stable", "deprecated")
 
 # Reserved OKF filenames: an index.md or log.md must never carry frontmatter
@@ -100,6 +111,8 @@ def build_frontmatter(spec: dict[str, Any]) -> str:
         if key in ("type", "status", "sources", "distilled_at"):
             continue  # the managed fields above win
         fields[key] = value
+    # `role` is an instruction to this helper, not bundle metadata: the bundle's
+    # own vocabulary lives in `type`.
 
     lines = ["---"]
     lines += [f"{key}: {yaml_value(value)}" for key, value in fields.items()]
@@ -155,8 +168,16 @@ def validate(spec: dict[str, Any]) -> tuple[Path, str]:
     if not spec.get("bundle"):
         raise ValueError("`bundle` is required")
     node_type = spec.get("type")
-    if node_type not in NODE_TYPES:
-        raise ValueError(f"`type` must be one of {', '.join(NODE_TYPES)}, got {node_type!r}")
+    if not isinstance(node_type, str) or not node_type.strip():
+        raise ValueError("`type` is required")
+    role = spec.get("role") or DEFAULT_TYPES.get(node_type)
+    if role is None:
+        raise ValueError(
+            f"`role` is required when `type` is not one of "
+            f"{', '.join(DEFAULT_TYPES)} — got type={node_type!r}"
+        )
+    if role not in ROLES:
+        raise ValueError(f"`role` must be one of {', '.join(ROLES)}, got {role!r}")
     status = spec.get("status") or "draft"
     if status not in STATUSES:
         raise ValueError(f"`status` must be one of {', '.join(STATUSES)}, got {status!r}")

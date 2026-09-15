@@ -113,9 +113,39 @@ class WriteNodeTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.write(slug=reserved)
 
-    def test_unknown_type_is_refused(self):
-        with self.assertRaises(ValueError):
+    def test_a_custom_type_without_a_role_is_refused(self):
+        """A name outside the defaults must say which of the three roles it plays."""
+        with self.assertRaises(ValueError) as caught:
             self.write(type="State")
+        self.assertIn("role", str(caught.exception))
+
+    def test_bundle_vocabulary_replaces_the_default_type_name(self):
+        """A bundle that calls its lessons `Finding` keeps doing so."""
+        text = self.write(type="Finding", role="lesson").read_text(encoding="utf-8")
+        self.assertIn('type: "Finding"', text)
+        self.assertNotIn("Lesson", text)
+
+    def test_role_is_an_instruction_not_frontmatter(self):
+        text = self.write(type="Finding", role="lesson").read_text(encoding="utf-8")
+        self.assertNotIn("role:", text)
+
+    def test_unknown_role_is_refused(self):
+        for role in ("state", "status", ""):
+            with self.subTest(role=role):
+                with self.assertRaises(ValueError):
+                    self.write(type="Finding", role=role or None)
+
+    def test_missing_type_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.write(type=None)
+
+    def test_extra_carries_a_bundle_s_own_fields(self):
+        """Neighbouring documents may share fields OKF knows nothing about."""
+        text = self.write(
+            extra={"lifecycle": "current", "succeeded_by": "../decisions/newer.md"}
+        ).read_text(encoding="utf-8")
+        self.assertIn('lifecycle: "current"', text)
+        self.assertIn('succeeded_by: "../decisions/newer.md"', text)
 
     def test_unknown_status_is_refused(self):
         with self.assertRaises(ValueError):

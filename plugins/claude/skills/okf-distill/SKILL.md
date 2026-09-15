@@ -45,7 +45,8 @@ uv run python <skill-dir>/../resume-codex-session/scripts/summarize_codex_rollou
 ```
 
 4. Extract nodes. **You** do this — the scripts only fetch text. Exactly three
-   types, and nothing else:
+   roles, and nothing else (the bundle may have its own names for them — see
+   below):
 
    | Type | Records | Must contain |
    |------|---------|--------------|
@@ -71,6 +72,19 @@ uv run python <skill-dir>/../resume-codex-session/scripts/summarize_codex_rollou
      language where translating it would lose the meaning. Pass
      `related_heading` to the helper so the links heading is written in that
      language too — it sits in the body and defaults to English otherwise.
+   - **The three roles are fixed; their names are not.** Read the bundle before
+     choosing a `type`. If its documents already have a name for one of these
+     roles — `Finding` for a lesson, `Note` for a concept, whatever it uses —
+     write that name and pass `role` (`decision` / `lesson` / `concept`) so the
+     helper still enforces the no-state-nodes rule. Only an empty bundle gets
+     the default `Decision` / `Lesson` / `Concept`. A parallel vocabulary in the
+     same bundle splits the graph in two and is worse than an imperfect fit.
+   - **Match the neighbours' frontmatter too.** If the bundle's documents share
+     fields OKF does not define — a `lifecycle` value, a `succeeded_by` pointer,
+     tags, an owner — fill them through `extra` so a new node is
+     indistinguishable from the documents around it. A node that is missing the
+     field every other document has is the one that falls out of the bundle's
+     own tooling.
 
 5. **Sanitize.** A bundle is shared and often published; a transcript is not.
    Before writing, strip internal hostnames and IP addresses, colleague and
