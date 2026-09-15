@@ -1,6 +1,6 @@
 {
   "name": "acdc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Resume or continue a local Claude Code session from Codex. Reads the prior Claude transcript and current repo state, then hands off a structured summary so Codex takes over where Claude left off. Also includes recall-session and recall-context skills for self-recall over past sessions.",
   "author": {
     "name": "awithi-co",
