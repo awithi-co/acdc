@@ -1,0 +1,4 @@
+interface:
+  display_name: "Distill sessions into OKF nodes"
+  short_description: "Turn past sessions into durable knowledge nodes"
+  default_prompt: "Use $okf-distill to distill the sessions I name into Decision, Lesson and Concept nodes in the OKF bundle."

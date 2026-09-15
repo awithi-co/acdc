@@ -48,6 +48,30 @@ class MirrorCopyTests(unittest.TestCase):
                     f"{right.relative_to(REPO_ROOT)}",
                 )
 
+    def test_non_python_script_assets_are_mirrored_by_path(self):
+        """Shell and vendored-JS assets are copies too, and share a skill name.
+
+        Only the handoff pair differs in skill name between plugins, and that
+        pair ships no non-Python assets — so these can be matched by their path
+        below `skills/` rather than by basename.
+        """
+        def assets(agent):
+            root = REPO_ROOT / "plugins" / agent / "skills"
+            return {
+                path.relative_to(root): path
+                for path in sorted(root.glob("*/scripts/**/*"))
+                if path.is_file() and path.suffix not in (".py", ".pyc")
+            }
+
+        claude, codex = (assets(agent) for agent in PLUGINS)
+        self.assertTrue(claude, "expected at least one non-Python script asset")
+        self.assertEqual(sorted(claude), sorted(codex),
+                         "every script asset must exist in both plugins")
+        for rel in sorted(claude):
+            with self.subTest(asset=str(rel)):
+                self.assertEqual(claude[rel].read_bytes(), codex[rel].read_bytes(),
+                                 f"copies diverged: skills/{rel}")
+
     def test_every_script_has_a_counterpart(self):
         claude, codex = (self.by_agent[agent] for agent in PLUGINS)
         self.assertEqual(
