@@ -68,7 +68,9 @@ uv run python <skill-dir>/../resume-codex-session/scripts/summarize_codex_rollou
      existing documents; for an empty bundle, take it from the user. A session
      held in one language often belongs in a bundle written in another, so
      decide this before writing, not per node. Quote a term in its original
-     language where translating it would lose the meaning.
+     language where translating it would lose the meaning. Pass
+     `related_heading` to the helper so the links heading is written in that
+     language too — it sits in the body and defaults to English otherwise.
 
 5. **Sanitize.** A bundle is shared and often published; a transcript is not.
    Before writing, strip internal hostnames and IP addresses, colleague and

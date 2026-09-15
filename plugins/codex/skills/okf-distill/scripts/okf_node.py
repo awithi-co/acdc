@@ -19,6 +19,7 @@ Input (stdin, JSON object):
       "distilled_at": "2026-09-16",        # optional, default: today
       "body":     "markdown body",
       "links":    [{"text": "Why", "target": "/decisions/other.md"}],
+      "related_heading": "Related",        # optional, heading above the links
       "extra":    {"tags": ["okf"]}        # optional extra frontmatter fields
     }
 
@@ -143,7 +144,10 @@ def build_body(spec: dict[str, Any]) -> str:
                 continue
             rendered.append(f"- [{text}]({relative_target(target, subdir)})")
         if rendered:
-            parts.append("## Related\n\n" + "\n".join(rendered))
+            # The heading sits in the document body, so it has to be written in the
+            # bundle's language like everything else around it.
+            heading = (spec.get("related_heading") or "Related").strip()
+            parts.append(f"## {heading}\n\n" + "\n".join(rendered))
     return "\n\n".join(parts)
 
 

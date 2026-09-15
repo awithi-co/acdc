@@ -131,6 +131,15 @@ class WriteNodeTests(unittest.TestCase):
         path = self.write(subdir=None)
         self.assertEqual(path.parent, self.bundle)
 
+    def test_related_heading_follows_the_bundle_language(self):
+        """The heading sits in the body, so it cannot stay English by default."""
+        text = self.write(related_heading="관련").read_text(encoding="utf-8")
+        self.assertIn("## 관련", text)
+        self.assertNotIn("## Related", text)
+
+    def test_related_heading_defaults_to_english(self):
+        self.assertIn("## Related", self.write().read_text(encoding="utf-8"))
+
     def test_no_written_link_is_root_relative(self):
         text = self.write(
             links=[
