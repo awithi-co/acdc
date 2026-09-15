@@ -1,3 +1,4 @@
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -245,7 +246,31 @@ FIXTURE_EMPTY_PATH = (FIXTURES_CLAUDE / "projects" / "-tmp-fixture"
                       / "ffffffff-6666-7f66-f666-666666666666.jsonl")
 
 
+def pin_mtimes(mapping):
+    """Pin fixture mtimes.
+
+    Scope selection filters transcripts by mtime, and git does not preserve
+    mtimes, so a fresh clone would otherwise see every fixture as brand new.
+    """
+    for path, moment in mapping.items():
+        stamp = moment.timestamp()
+        os.utime(path, (stamp, stamp))
+
+
+CLAUDE_FIXTURE_MTIMES = {
+    FIXTURE_ACDC_PATH: dt.datetime(2026, 4, 26, 10, 0, 0),
+    FIXTURE_EMPTY_PATH: dt.datetime(2026, 4, 20, 12, 0, 0),
+    FIXTURES_CLAUDE / "projects" / "-tmp-fixture"
+    / "cccccccc-3333-4c33-c333-333333333333.jsonl": dt.datetime(2026, 4, 25, 2, 11, 24),
+    FIXTURES_CLAUDE / "projects" / "-tmp-fixture"
+    / "dddddddd-4444-4d44-d444-444444444444.jsonl": dt.datetime(2026, 4, 25, 2, 33, 50),
+}
+
+
 class SelectTranscriptsClaudeTests(unittest.TestCase):
+    def setUp(self):
+        pin_mtimes(CLAUDE_FIXTURE_MTIMES)
+
     # spec §8.2: test_scope_current
     def test_current_returns_only_passed_path(self):
         result = grep_recall.select_transcripts(
@@ -299,7 +324,22 @@ FIXTURE_CODEX_EMPTY = (FIXTURES_CODEX / "sessions" / "2026" / "04" / "20"
                        / "rollout-2026-04-20T12-00-00-ffffffff-6666-7f66-f666-666666666666.jsonl")
 
 
+CODEX_FIXTURE_MTIMES = {
+    FIXTURE_CODEX_ACDC: dt.datetime(2026, 4, 26, 10, 0, 0),
+    FIXTURE_CODEX_EMPTY: dt.datetime(2026, 4, 20, 12, 0, 0),
+    FIXTURES_CODEX / "sessions" / "2026" / "04" / "25"
+    / "rollout-2026-04-25T02-11-24-aaaaaaaa-1111-7a11-a111-111111111111.jsonl":
+        dt.datetime(2026, 4, 25, 2, 11, 24),
+    FIXTURES_CODEX / "sessions" / "2026" / "04" / "25"
+    / "rollout-2026-04-25T02-33-50-bbbbbbbb-2222-7b22-b222-222222222222.jsonl":
+        dt.datetime(2026, 4, 25, 2, 33, 50),
+}
+
+
 class SelectTranscriptsCodexTests(unittest.TestCase):
+    def setUp(self):
+        pin_mtimes(CODEX_FIXTURE_MTIMES)
+
     # spec §8.2: test_scope_days (Codex)
     def test_codex_days_1(self):
         anchor = dt.datetime(2026, 4, 26, 12, 0, 0)
