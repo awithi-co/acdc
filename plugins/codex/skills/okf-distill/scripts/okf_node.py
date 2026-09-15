@@ -26,6 +26,8 @@ Input (stdin, JSON object):
       "body":     "markdown body",
       "links":    [{"text": "Why", "target": "/decisions/other.md"}],
       "related_heading": "Related",        # optional, heading above the links
+      "provenance": true,                  # optional; false omits sources/generated
+      "field_order": ["type", "title"],    # optional; frontmatter key order
       "extra":    {"tags": ["okf"]}        # optional extra frontmatter fields
     }
 
@@ -33,6 +35,11 @@ The three roles are fixed; their names are not. A bundle that already calls its
 lessons `Finding` keeps doing so — pass `type: "Finding"` with `role: "lesson"`.
 `role` is what the no-state-nodes rule is enforced against, so it is required
 whenever `type` is not one of the three default names.
+
+A bundle may already own the key `sources` for something else — superdocs uses
+it for a derived document's source *files* — in which case writing OKF §5
+provenance there would put two meanings on one key. Pass `provenance: false` and
+record the origin in the body instead, the way that bundle does.
 
 A link target may be given root-relative (`/decisions/other.md`) or already
 file-relative; either way it is written file-relative to this node's own
@@ -140,13 +147,21 @@ def build_frontmatter(spec: dict[str, Any]) -> str:
         if key in ("type", "status", "sources", "generated"):
             continue  # the managed fields win
         fields[key] = value
+
+    # A bundle's own frontmatter has an order its readers are used to. Matching
+    # it is the difference between a new node and an obviously foreign one.
+    order = spec.get("field_order")
+    if order:
+        ranked = {key: index for index, key in enumerate(order)}
+        fields = dict(sorted(fields.items(), key=lambda kv: (ranked.get(kv[0], len(ranked)),)))
     # `role` is an instruction to this helper, not bundle metadata: the bundle's
     # own vocabulary lives in `type`.
 
     lines = ["---"]
     lines += [f"{key}: {yaml_value(value)}" for key, value in fields.items()]
-    lines += render_sources(spec)
-    lines.append(render_generated(spec))
+    if spec.get("provenance", True):
+        lines += render_sources(spec)
+        lines.append(render_generated(spec))
     lines.append("---")
     return "\n".join(lines)
 

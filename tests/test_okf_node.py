@@ -278,6 +278,23 @@ class WriteNodeTests(unittest.TestCase):
         self.assertNotIn("](../concepts/본체", text)
         self.assertIn("# 워크트리 단일 소유", text)
 
+    def test_provenance_can_be_suppressed(self):
+        """A bundle may already own the key `sources` for something else."""
+        text = self.write(provenance=False, extra={"lifecycle": "current"}).read_text()
+        self.assertNotIn("sources:", text)
+        self.assertNotIn("generated:", text)
+        self.assertIn('lifecycle: "current"', text)
+
+    def test_field_order_follows_the_bundle(self):
+        text = self.write(
+            provenance=False,
+            extra={"lifecycle": "current", "date": "2026-09-16", "description": "d"},
+            field_order=["type", "title", "description", "status", "lifecycle", "date"],
+        ).read_text(encoding="utf-8")
+        keys = [line.split(":", 1)[0] for line in text.splitlines()[1:] if ":" in line]
+        head = keys[: keys.index("date") + 1]
+        self.assertEqual(head, ["type", "title", "description", "status", "lifecycle", "date"])
+
     def test_cli_reads_json_from_stdin(self):
         spec = {
             "bundle": str(self.bundle),

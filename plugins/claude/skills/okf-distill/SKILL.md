@@ -89,10 +89,16 @@ uv run python <skill-dir>/../resume-codex-session/scripts/summarize_codex_rollou
      title, which is right for an English bundle and wrong for any other.
    - **Match the neighbours' frontmatter too.** If the bundle's documents share
      fields OKF does not define — a `lifecycle` value, a `succeeded_by` pointer,
-     tags, an owner — fill them through `extra` so a new node is
-     indistinguishable from the documents around it. A node that is missing the
-     field every other document has is the one that falls out of the bundle's
-     own tooling.
+     tags, an owner — fill them through `extra`, and pass `field_order` so the
+     keys appear in the order the bundle uses. A node that is missing the field
+     every other document has is the one that falls out of the bundle's own
+     tooling.
+   - **If the bundle already uses `sources` for something else, do not fight it.**
+     Some bundles reserve that key for a document's source *files*. Writing OKF
+     §5 session provenance there would put two meanings on one key, which is the
+     failure the whole vocabulary rule exists to avoid. Pass `provenance: false`
+     and record the origin session in the body, in whatever shape that bundle
+     uses for it.
 
 5. **Sanitize.** A bundle is shared and often published; a transcript is not.
    Before writing, strip internal hostnames and IP addresses, colleague and
