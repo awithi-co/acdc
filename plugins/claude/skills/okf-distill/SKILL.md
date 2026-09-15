@@ -62,6 +62,13 @@ uv run python <skill-dir>/../resume-codex-session/scripts/summarize_codex_rollou
      conclusion is not a Decision.
    - See `<skill-dir>/references/node-template.md` for one worked example per
      type.
+   - **Write in the language of the bundle, not the language of the session.**
+     A node joins documents that will be read together; one node in another
+     language is the one nobody searches for. Take the language from the
+     existing documents; for an empty bundle, take it from the user. A session
+     held in one language often belongs in a bundle written in another, so
+     decide this before writing, not per node. Quote a term in its original
+     language where translating it would lose the meaning.
 
 5. **Sanitize.** A bundle is shared and often published; a transcript is not.
    Before writing, strip internal hostnames and IP addresses, colleague and
