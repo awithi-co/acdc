@@ -18,6 +18,10 @@ ACDC reads your local Claude Code and Codex sessions to put the context back whe
 
 Five skills per agent, each plugin self-contained.
 
+## Direct agent messaging (experimental)
+
+The [ACDC stdio relay](RELAY.md) lets running Claude and Codex peers discover and message each other across projects. Claude receives a channel notification; Codex receives a native `codex queue` submission. ACDC stores no message inbox or history. The MCP runtime requires uv/Python 3.11+; existing session-reading skills remain independent.
+
 ## Knowledge: OKF
 
 Recall is continuity within a session's lifetime. Some of what a session produces should outlive it — the choice you made and the two you rejected, the rule an incident earned, the term the work defined. Two skills write those into an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) (OKF) v0.2 bundle: a directory of markdown files whose frontmatter is the metadata and whose `.md` links are the graph edges.
@@ -90,7 +94,7 @@ For **recall by identifier**, the same finder/summarizer pair is used without th
 
 For **topic search**, a `grep_recall.py` helper scans JSONL files (current session + recent partition) and returns matched segments with surrounding event context.
 
-Pure Python 3 standard library only. No network access. Read-only against session storage.
+The session-reading helpers use the Python 3 standard library, require no network access, and remain read-only against session storage. The optional messaging runtime has separate SDK dependencies and sends messages to running chats.
 
 ## Session storage layout
 

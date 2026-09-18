@@ -145,3 +145,7 @@ OKF 번들 검사기는 추가로 PATH에 [Node.js](https://nodejs.org)가 필�
 ## 라이선스
 
 MIT
+
+## 에이전트 간 직접 메시지 (실험적)
+
+[ACDC stdio 릴레이](RELAY.md)는 실행 중인 Claude와 Codex를 찾아 채팅으로 메시지를 전달합니다. Claude channel과 Codex queue를 사용하며 ACDC 수신함·DB·대화 기록은 없습니다. MCP 런타임에는 uv/Python 3.11 이상이 필요하며 기존 읽기 전용 스킬과 독립적으로 동작합니다.

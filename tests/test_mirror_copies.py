@@ -72,6 +72,14 @@ class MirrorCopyTests(unittest.TestCase):
                 self.assertEqual(claude[rel].read_bytes(), codex[rel].read_bytes(),
                                  f"copies diverged: skills/{rel}")
 
+    def test_mcp_runtime_assets_are_self_contained_and_identical(self):
+        roots = [REPO_ROOT / 'plugins' / agent / 'mcp' for agent in PLUGINS]
+        names = [{p.name for p in root.iterdir() if p.is_file()} for root in roots]
+        self.assertEqual(names[0], names[1])
+        self.assertIn('server.py.lock', names[0])
+        for name in names[0]:
+            self.assertEqual((roots[0]/name).read_bytes(), (roots[1]/name).read_bytes())
+
     def test_every_script_has_a_counterpart(self):
         claude, codex = (self.by_agent[agent] for agent in PLUGINS)
         self.assertEqual(

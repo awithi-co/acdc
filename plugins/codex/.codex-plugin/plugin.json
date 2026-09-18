@@ -21,12 +21,17 @@
   "interface": {
     "displayName": "ACDC",
     "shortDescription": "Resume Claude Code sessions inside Codex",
-    "longDescription": "Resume or continue a local Claude Code session from Codex. Reads the Claude transcript, cross-checks current repo state, and produces a structured handoff — by session name or id.",
+    "longDescription": "Resume or continue a local Claude Code session from Codex. Reads the Claude transcript, cross-checks current repo state, and produces a structured handoff \u2014 by session name or id.",
     "category": "Productivity",
-    "capabilities": ["Read", "Interactive"],
+    "capabilities": [
+      "Read",
+      "Interactive"
+    ],
     "defaultPrompt": [
       "Resume a Claude Code session by name or id.",
       "Continue my Claude Code work in Codex."
-    ]
-  }
+    ],
+    "developerName": "awithi-co"
+  },
+  "mcpServers": "./.mcp.json"
 }
