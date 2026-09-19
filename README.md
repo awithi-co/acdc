@@ -20,7 +20,7 @@ Five skills per agent, each plugin self-contained.
 
 ## Direct agent messaging (experimental)
 
-The [ACDC stdio relay](RELAY.md) lets running Claude and Codex peers discover and message each other across projects. Claude receives a channel notification; Codex receives a native `codex queue` submission. ACDC stores no message inbox or history. The MCP runtime requires uv/Python 3.11+; existing session-reading skills remain independent.
+The [ACDC stdio relay](RELAY.md) lets Codex discover running Claude recipients and send context through Claude channel notifications. Claude delegates work to Codex through separately installed Codex tools; ACDC does not provide reverse delivery or require a remote Codex runtime. ACDC stores no message inbox or history. The MCP runtime requires uv/Python 3.11+; existing session-reading skills remain independent.
 
 ## Knowledge: OKF
 

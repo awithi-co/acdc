@@ -21,7 +21,6 @@ class Relay:
         self.server = None
         self.connections = set()
         self.ready = False
-        self.thread_id = None
         self.detail = 'MCP initialization pending'
 
     async def start(self):
@@ -36,7 +35,7 @@ class Relay:
 
     def describe(self):
         return {'id':self.id,'agent':self.agent,'name':self.name,'cwd':self.cwd,
-                'thread_id':self.thread_id,'ready':self.ready,'detail':self.detail}
+                'ready':self.ready,'detail':self.detail}
 
     async def request(self,peer_id,data,timeout=35):
         if not isinstance(peer_id,str) or not PEER_ID.fullmatch(peer_id):
