@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "relay": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--locked",
+        "--script",
+        "${CLAUDE_PLUGIN_ROOT}/mcp/server.py",
+        "--agent",
+        "claude"
+      ]
+    }
+  }
+}

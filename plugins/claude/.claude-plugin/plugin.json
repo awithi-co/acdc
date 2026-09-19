@@ -15,5 +15,6 @@
     "resume",
     "session",
     "bridge"
-  ]
+  ],
+  "mcpServers": "./.mcp.json"
 }
