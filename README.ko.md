@@ -148,4 +148,4 @@ MIT
 
 ## 에이전트 간 직접 메시지 (실험적)
 
-[ACDC stdio 릴레이](RELAY.md)는 Codex에서 실행 중인 Claude를 찾아 채널 메시지를 전달합니다. Claude의 Codex 위임은 별도 Codex 도구를 사용하며, 역방향 채널이나 remote 런타임은 요구하지 않습니다. ACDC 수신함·DB·대화 기록은 없습니다. MCP 런타임에는 uv/Python 3.11 이상이 필요하며 기존 읽기 전용 스킬과 독립적으로 동작합니다.
+[ACDC stdio 릴레이](RELAY.md)는 Codex에서 실행 중인 Claude를 찾아 채널 메시지를 전달합니다. 선택적으로 로컬 Codex app-server에 연결하면 Claude의 회신을 `codex queue`로 지정한 Codex 대화에 직접 전달합니다. 일반 Codex 실행은 송신 전용으로 유지됩니다. ACDC 수신함·DB·대화 기록은 없습니다. MCP 런타임에는 uv/Python 3.11 이상이 필요하며 기존 읽기 전용 스킬과 독립적으로 동작합니다.
