@@ -19,6 +19,7 @@ from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from pydantic import BaseModel
+from lifecycle import current_cwd
 from version import VERSION
 from relay import Relay
 from session import (
@@ -89,7 +90,7 @@ async def main():
         )
         return {"status": "transport_written", "read_confirmed": False}
 
-    relay = Relay(root, args.agent, os.getcwd(), deliver)
+    relay = Relay(root, args.agent, current_cwd(), deliver)
     if name := os.environ.get("ACDC_PEER_NAME"):
         relay.name = name[:80]
 
@@ -232,7 +233,7 @@ async def main():
                 for p in await relay.peers()
                 if p.get("ready") and p["id"] != (automatic or {}).get("id")
             ]
-            caller_cwd = (automatic or {}).get("cwd", os.getcwd())
+            caller_cwd = (automatic or {}).get("cwd") or relay.cwd
             caller_project = project_key(caller_cwd)
             for peer in result:
                 peer["same_project"] = (
