@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "relay": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--locked",
+        "--script",
+        "${CLAUDE_PLUGIN_ROOT}/mcp/server.py",
+        "--agent",
+        "codex"
+      ],
+      "env_vars": ["CODEX_HOME", "CLAUDE_CONFIG_DIR", "ACDC_RELAY_DIR", "ACDC_CODEX_REMOTE"]
+    }
+  }
+}

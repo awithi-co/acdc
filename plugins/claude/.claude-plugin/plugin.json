@@ -1,7 +1,7 @@
 {
   "name": "acdc",
-  "description": "Resume or continue a local Codex session from Claude Code. Reads the prior Codex rollout and current repo state, then hands off a structured summary so Claude takes over where Codex left off. Also includes recall-session and recall-context skills for self-recall over past sessions.",
-  "version": "0.3.0",
+  "description": "Collaborate with open Claude Code and Codex CLI sessions, recall prior conversations, and resume work across agents.",
+  "version": "0.5.0",
   "author": {
     "name": "awithi-co"
   },
@@ -15,5 +15,6 @@
     "resume",
     "session",
     "bridge"
-  ]
+  ],
+  "mcpServers": "./.mcp.json"
 }
