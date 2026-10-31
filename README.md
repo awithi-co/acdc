@@ -15,8 +15,15 @@ ACDC reads your local Claude Code and Codex sessions to put the context back whe
 | `resume-codex-session` (Claude side) / `resume-claude-session` (Codex side) | Cross-agent handoff: read the prior session and current repo state, then hand a structured summary to the new agent so it continues rather than echoes the last few messages. | "resume the codex session called api-refactor" |
 | `recall-session` | Self-recall: look up your own past session by name or UUID. Returns a timeline summary — what you decided, what changed, where you left off. | "show me yesterday's api-refactor session" |
 | `recall-context` | Topic search: find where you discussed something across your sessions, even pre-compaction in the current one. | "where did we decide on the ACDC name" |
+| `collaborate` | Discover another running CLI session, confirm the counterpart once, and exchange questions and reviews while preserving both conversations. | "Discuss this design with Codex" |
 
-Five skills per agent, each plugin self-contained.
+Six skills per agent, each plugin self-contained.
+
+## CLI collaboration
+
+Install the updated plugins, open `claude` and `codex` normally, and ask either one to collaborate. ACDC discovers available sessions and asks which one to connect; follow-ups keep that selection. No session UUID, Python launcher, port configuration, or Claude channel flag is needed for the automatic CLI path. Initial plugin/tool trust still applies.
+
+Verified with Claude Code 2.1.314 and Codex 0.166.0 on Linux. Claude receives through a bundled background hook; Codex uses its existing shared daemon and native queue. Discovery and waiting do not call a model. Message bodies are held only in a bounded live-session buffer, never an ACDC message database. The MCP runtime requires uv/Python 3.11+. See [delivery semantics, permissions, and supported modes](RELAY.md). Desktop support is not yet claimed.
 
 ## Knowledge: OKF
 
@@ -55,27 +62,25 @@ Both skills read it, and write it once (after asking) when it is missing.
 
 ## Install
 
-**Claude Code** — slash commands inside the CLI:
+Install through [Woodstock](https://github.com/awithi-co/woodstock).
 
-```
-/plugin marketplace add https://github.com/awithi-co/acdc
-/plugin install acdc
-```
+**Claude Code**, inside the CLI:
 
-**Codex** — shell command + enable:
-
-```
-codex plugin marketplace add awithi-co/acdc
+```text
+/plugin marketplace add awithi-co/woodstock
+/plugin install acdc@woodstock
 ```
 
-`marketplace add` registers ACDC as *available*. To activate it (so skills are discoverable by natural-language dispatch), either pick ACDC from `codex`'s interactive plugin picker, or append to `~/.codex/config.toml`:
+**Codex**, in a terminal:
 
-```toml
-[plugins."acdc@acdc"]
-enabled = true
+```sh
+codex plugin marketplace add awithi-co/woodstock
+codex plugin add acdc@woodstock
 ```
 
-After install, trigger skills with natural language — the example invocations above work as-is. The plugin's manifest routes the request to the correct skill in each agent.
+Open both CLIs normally and ask “Discuss this design with the open Codex session.” Select the counterpart once. If a unique session is already named in the request, no extra selection is needed. Initial plugin, hook and tool trust follows each CLI's policy.
+
+For updates, refresh the Woodstock marketplace and update/reinstall `acdc@woodstock`, then reopen the CLI. Keep only one ACDC installation enabled: disable a previous `acdc@acdc` development install before enabling `acdc@woodstock`.
 
 ## How it works
 
@@ -90,7 +95,7 @@ For **recall by identifier**, the same finder/summarizer pair is used without th
 
 For **topic search**, a `grep_recall.py` helper scans JSONL files (current session + recent partition) and returns matched segments with surrounding event context.
 
-Pure Python 3 standard library only. No network access. Read-only against session storage.
+The session-reading helpers use the Python 3 standard library, require no network access, and remain read-only against session storage. The optional messaging runtime has separate SDK dependencies and sends messages to running chats.
 
 ## Session storage layout
 
@@ -124,13 +129,13 @@ history.jsonl                                          per-prompt log
 
 ## Requirements
 
-Python 3 on PATH. Pre-installed on macOS 12.3+ and most Linux distributions; on Windows, install from python.org if unavailable. The skill tries `uv run python`, then `python3`, then `python`, and stops with a clear message if none are found.
+Recall and handoff need Python 3. CLI collaboration additionally requires Linux, Python 3.11+ on PATH as `python3`, and `uv` for the locked MCP dependencies. See [supported modes and recovery](RELAY.md).
 
 The OKF bundle checker additionally needs [Node.js](https://nodejs.org) on PATH. Only `okf_check.sh` uses it; the recall and handoff skills do not.
 
 ## Privacy & limitations
 
-- ACDC reads local session files on your machine to build a handoff or recall summary. It does **not** upload anything to an external service, and it does **not** sanitize or redact transcript content.
+- ACDC reads local session files for recall and handoff. Selected context enters an agent conversation and follows that agent provider's privacy policy. Native transcript content is not sanitized or redacted.
 - Each plugin needs local filesystem access to its own session storage (and to the other agent's storage when used for handoff).
 - Session storage formats are owned by their respective products; large version changes may require parser updates.
 - When multiple sessions match the same name, the skill shows scored candidates and asks.

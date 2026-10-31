@@ -15,8 +15,15 @@ ACDC는 로컬 Claude Code와 Codex 세션 저장소를 읽어서, 필요한 곳
 | `resume-codex-session` (Claude 측) / `resume-claude-session` (Codex 측) | 에이전트 간 인계: 이전 세션과 현재 레포 상태를 읽고, 구조화된 요약을 새 에이전트에게 넘겨서 마지막 몇 메시지를 그대로 되풀이하는 게 아니라 실제로 작업을 이어가게 합니다. | "api-refactor라는 codex 세션 이어받아줘" |
 | `recall-session` | 자가 회상: 본인의 과거 세션을 이름이나 UUID로 조회. 무엇을 결정했고, 무엇이 바뀌었고, 어디서 끊겼는지 타임라인 요약. | "어제 한 api-refactor 세션 보여줘" |
 | `recall-context` | 토픽 검색: 세션 간에서 어디서 그 얘기 했었는지 찾아냅니다 — 현재 세션의 compact 이전까지 포함해서. | "ACDC 네이밍 어디서 결정했지" |
+| `collaborate` | 실행 중인 CLI 세션을 찾고 상대를 한 번 확인한 뒤, 각 대화의 맥락을 유지하며 질문과 검토 의견을 교환합니다. | "이 설계 코덱스랑 같이 검토해줘" |
 
-에이전트당 5개 스킬, 각 플러그인은 자급자족(self-contained).
+에이전트당 6개 스킬이며 각 플러그인은 독립적으로 설치할 수 있습니다.
+
+## CLI 자동 연결
+
+업데이트된 플러그인을 설치하고 평소처럼 `claude`와 `codex`를 실행합니다. 한쪽에 협업을 요청하면 연결할 세션만 확인하며, 같은 상대와의 후속 대화에는 다시 묻지 않습니다. UUID 복사, Python 실행기, 포트 설정, Claude 채널 플래그는 기본 흐름에 필요하지 않습니다. 최초 플러그인 및 도구 신뢰 절차는 적용됩니다.
+
+Linux의 Claude Code 2.1.314와 Codex 0.166.0에서 검증하였습니다. 발견과 대기에는 모델을 호출하지 않으며, ACDC는 영구 메시지 DB를 만들지 않습니다. 자세한 수신 방식과 지원 범위는 [연결 안내](RELAY.md)를 참조하십시오. 데스크톱 지원은 아직 검증하지 않았습니다.
 
 ## 지식: OKF
 
@@ -55,27 +62,25 @@ ACDC는 로컬 Claude Code와 Codex 세션 저장소를 읽어서, 필요한 곳
 
 ## 설치
 
-**Claude Code** — CLI 안에서 슬래시 명령:
+[Woodstock](https://github.com/awithi-co/woodstock)을 통해 설치합니다.
 
-```
-/plugin marketplace add https://github.com/awithi-co/acdc
-/plugin install acdc
-```
+**Claude Code**, CLI 안에서:
 
-**Codex** — 쉘 명령 + enable:
-
-```
-codex plugin marketplace add awithi-co/acdc
+```text
+/plugin marketplace add awithi-co/woodstock
+/plugin install acdc@woodstock
 ```
 
-`marketplace add`는 ACDC를 *사용 가능* 상태로 등록만 합니다. 자연어 디스패치로 스킬이 발견되려면 활성화가 필요합니다 — `codex` 인터랙티브 모드의 플러그인 피커에서 ACDC를 선택하거나, `~/.codex/config.toml`에 다음을 추가하세요:
+**Codex**, 터미널에서:
 
-```toml
-[plugins."acdc@acdc"]
-enabled = true
+```sh
+codex plugin marketplace add awithi-co/woodstock
+codex plugin add acdc@woodstock
 ```
 
-설치 후에는 자연어로 발동하면 됩니다 — 위 표의 발동 예시가 그대로 동작합니다. 플러그인의 manifest가 각 에이전트의 올바른 스킬로 요청을 라우팅합니다.
+평소처럼 양쪽 CLI를 열고 “열린 Codex 세션과 이 설계를 검토해 줘”라고 요청합니다. 상대 세션만 한 번 확인하면 됩니다. 요청에서 고유한 세션을 지정했다면 추가 확인을 생략합니다. 최초 플러그인·훅·도구 신뢰는 각 CLI 정책을 따릅니다.
+
+업데이트할 때는 Woodstock 마켓플레이스를 새로 고친 뒤 `acdc@woodstock`을 업데이트하거나 다시 설치하고 CLI를 다시 엽니다. 기존 개발용 `acdc@acdc`가 있다면 비활성화하여 ACDC 설치본 하나만 켜 둡니다.
 
 ## 동작 원리
 
@@ -90,7 +95,7 @@ enabled = true
 
 **토픽 검색** 시에는 `grep_recall.py` 헬퍼가 JSONL 파일(현재 세션 + 최근 파티션)을 스캔하여 매치된 segment를 주변 이벤트 컨텍스트와 함께 반환합니다.
 
-Python 3 표준 라이브러리만 사용. 네트워크 접근 없음. 세션 저장소에 대해 읽기 전용.
+회상·인계 스크립트는 Python 3 표준 라이브러리로 로컬 기록을 읽습니다. CLI 협업은 별도의 MCP 의존성과 로컬 소켓을 사용합니다.
 
 ## 세션 저장 구조
 
@@ -124,13 +129,13 @@ history.jsonl                                          프롬프트 단위 로�
 
 ## 요구사항
 
-PATH에 Python 3가 있어야 합니다. macOS 12.3+와 대부분의 Linux 배포판은 기본 탑재되어 있고, Windows는 python.org에서 설치하시면 됩니다. 스킬은 `uv run python` → `python3` → `python` 순서로 시도하며, 셋 다 없으면 명확한 메시지와 함께 중단합니다.
+회상·인계에는 Python 3가 필요합니다. CLI 협업에는 Linux, PATH의 `python3`(3.11 이상), 잠긴 MCP 의존성을 실행할 `uv`가 추가로 필요합니다. [지원 범위와 복구](RELAY.md)를 참조하십시오.
 
 OKF 번들 검사기는 추가로 PATH에 [Node.js](https://nodejs.org)가 필요합니다. `okf_check.sh` 하나만 쓰며, 회상·인계 스킬은 필요하지 않습니다.
 
 ## 프라이버시 & 제한사항
 
-- ACDC는 인수인계나 회상 요약을 만들기 위해 머신의 로컬 세션 파일을 읽습니다. 외부 서비스로 어떤 것도 업로드하지 **않으며**, 트랜스크립트 내용을 정제(sanitize)하거나 마스킹(redact)하지도 **않습니다**.
+- ACDC는 회상·인계를 위해 로컬 세션 파일을 읽습니다. 선택한 맥락은 에이전트 대화에 들어가며 해당 제공자의 개인정보 정책을 따릅니다. 원본 트랜스크립트는 정제하거나 마스킹하지 않습니다.
 - 각 플러그인은 자기 세션 저장소에 대한 로컬 파일시스템 접근 권한을 필요로 합니다 (인계 시에는 상대 에이전트 저장소까지).
 - 세션 저장소 형식은 각 제품이 소유하므로, 큰 버전 변경이 있을 경우 파서 업데이트가 필요할 수 있습니다.
 - 같은 이름에 여러 세션이 일치할 때는 스킬이 점수화된 후보를 보여주고 묻습니다.

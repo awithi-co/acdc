@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${PLUGIN_ROOT}/mcp/hook.py\" start --agent codex; else echo \"ACDC: Python 3.11+ is required.\" >&2; exit 0; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${PLUGIN_ROOT}/mcp/hook.py\" end --agent codex; else echo \"ACDC: Python 3.11+ is required.\" >&2; exit 0; fi",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

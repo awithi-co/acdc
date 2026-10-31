@@ -75,7 +75,7 @@ def _extract_codex_payload(payload: Any, include_tools: bool) -> str:
         content = payload.get("content")
         if isinstance(content, list):
             parts = [b.get("text", "") for b in content
-                     if isinstance(b, dict) and b.get("type") == "text"]
+                     if isinstance(b, dict) and b.get("type") in ("text", "input_text", "output_text")]
             return "\n".join(p for p in parts if isinstance(p, str))
         if isinstance(content, str):
             return content
@@ -339,7 +339,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "(Codex partitions by date, not cwd; flag silently ignored on Codex)."
         ),
     )
-    p.add_argument("--query", required=True, help="text to search for (regex)")
+    p.add_argument("--query", required=True, help="literal text to search for (case-insensitive; not regex)")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--current", action="store_true",
                    help="search the current session transcript only")

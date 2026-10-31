@@ -383,6 +383,30 @@ SCRIPT_PATH = SCRIPT_DIR / "grep_recall.py"
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_codex_native_text_blocks_are_searchable(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            transcript = Path(directory) / 'rollout.jsonl'
+            rows = [
+                {'type': 'response_item', 'payload': {
+                    'type': 'message', 'role': role,
+                    'content': [{'type': kind, 'text': text}]} }
+                for role, kind, text in [
+                    ('user', 'input_text', 'KLM 검토 요청'),
+                    ('assistant', 'output_text', 'KLM은 조건부 추정입니다'),
+                ]
+            ]
+            transcript.write_text('\n'.join(json.dumps(row) for row in rows))
+            proc = self._run('--query', 'KLM', '--agent', 'codex',
+                             '--current-transcript', str(transcript), '--current', '--json')
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertNotIn('no matches', proc.stdout)
+            parsed = json.loads(proc.stdout)
+            hits = [event['preview'] for tr in parsed['transcripts']
+                    for segment in tr['segments'] for event in segment['events']
+                    if event['is_hit']]
+            self.assertEqual(hits, ['KLM 검토 요청', 'KLM은 조건부 추정입니다'])
+
     def _run(self, *args):
         proc = subprocess.run(
             ["python3", str(SCRIPT_PATH), *args],

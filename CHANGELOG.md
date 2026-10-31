@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.0 — 2026-10-31
+
+### Added
+
+- Connect existing Claude Code and Codex CLI sessions with one counterpart selection, native session titles and scoped MCP replies.
+- Read original human requests independently from native transcripts, including long image-heavy sessions. Expose unavailable, changed, truncated and incomplete evidence explicitly.
+- Recover Claude registration after mid-session plugin activation and retain Codex connections through transient discovery failures.
+- Upgrade inactive runtime helpers safely, defer upgrades during active collaborations, and reject incompatible runtime pairs.
+- Add isolated native CLI probes, an explicitly opt-in real-model E2E, and automated contract tests.
+
+### Changed
+
+- Separate native transport, process lifecycle and bounded transcript reading for maintainability.
+- Refresh locked runtime and test dependencies and check their published advisories in CI.
+- Distribute the CLI collaboration release through Woodstock with a pinned source version.
+
+### Supported scope
+
+- Validated on Linux with Claude Code 2.1.314 and Codex 0.166.0. Desktop, macOS, remote Codex and `--no-daemon` automatic discovery remain unverified.
+
 ## 0.3.0 — 2026-09-16
 
 ### Added

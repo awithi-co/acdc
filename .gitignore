@@ -9,3 +9,7 @@ __pycache__/
 
 # Internal design docs (specs, plans)
 docs/
+
+# Local test dependencies and agent work state
+tests/mcp/node_modules/
+.superpowers/
