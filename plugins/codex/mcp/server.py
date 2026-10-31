@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["mcp==1.26.0", "websockets==15.0.1"]
+# dependencies = ["mcp==1.30.0", "websockets==15.0.1"]
 # ///
 """ACDC stdio tools and direct chat delivery. No ACDC inbox or history."""
 

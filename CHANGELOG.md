@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Separate native transport, process lifecycle and bounded transcript reading for maintainability.
+- Refresh locked runtime and test dependencies and check their published advisories in CI.
 - Distribute the CLI collaboration release through Woodstock with a pinned source version.
 
 ### Supported scope

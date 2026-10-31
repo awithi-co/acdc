@@ -10,9 +10,9 @@
     "test": "node --test *.test.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.27.1"
+    "@modelcontextprotocol/sdk": "1.32.2"
   },
   "devDependencies": {
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   }
 }

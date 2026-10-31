@@ -15,6 +15,27 @@ from unittest.mock import patch
 SOURCE = Path(__file__).parents[1] / "plugins/claude/mcp/session.py"
 
 
+class HookPackagingTests(unittest.TestCase):
+    def test_missing_python_reports_prerequisite_without_hook_exit_127(self):
+        for agent in ("claude", "codex"):
+            path = SOURCE.parents[2] / agent / "hooks/hooks.json"
+            hooks = json.loads(path.read_text())["hooks"]
+            for event, groups in hooks.items():
+                for group in groups:
+                    for hook in group["hooks"]:
+                        result = subprocess.run(
+                            ["/bin/sh", "-c", hook["command"]],
+                            env={"PATH": "/nonexistent"},
+                            capture_output=True,
+                            text=True,
+                            timeout=2,
+                        )
+                        self.assertEqual(
+                            result.returncode, 0, (agent, event, result.stderr)
+                        )
+                        self.assertIn("Python 3.11+", result.stderr)
+
+
 class AutoConnectTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.assertTrue(SOURCE.exists(), "Automatic session transport is missing")
