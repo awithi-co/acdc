@@ -2,6 +2,8 @@
 
 import asyncio
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -16,6 +18,30 @@ SOURCE = Path(__file__).parents[1] / "plugins/claude/mcp/session.py"
 
 
 class HookPackagingTests(unittest.TestCase):
+    def test_unsupported_hooks_skip_runtime_import_and_missing_uv_is_explained(self):
+        spec = importlib.util.spec_from_file_location(
+            "acdc_hook", SOURCE.with_name("hook.py")
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for platform, version, uv in [
+            ("win32", (3, 12), "/bin/uv"),
+            ("darwin", (3, 12), "/bin/uv"),
+            ("linux", (3, 10), "/bin/uv"),
+            ("linux", (3, 12), None),
+        ]:
+            with (
+                patch.object(module.sys, "platform", platform),
+                patch.object(module.sys, "version_info", version),
+                patch.object(module.sys, "argv", ["hook.py", "start"]),
+                patch.object(module.shutil, "which", return_value=uv),
+                patch.object(module.runpy, "run_path") as runtime,
+                contextlib.redirect_stderr(io.StringIO()) as output,
+            ):
+                self.assertEqual(module.main(), 0)
+                runtime.assert_not_called()
+                self.assertIn("ACDC:", output.getvalue())
+
     def test_missing_python_reports_prerequisite_without_hook_exit_127(self):
         for agent in ("claude", "codex"):
             path = SOURCE.parents[2] / agent / "hooks/hooks.json"

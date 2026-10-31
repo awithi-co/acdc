@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/session.py\" start --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/hook.py\" start --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
             "timeout": 10
           }
         ]
@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/session.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/hook.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
             "asyncRewake": true,
             "timeout": 86400
           }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/session.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/hook.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
             "asyncRewake": true,
             "timeout": 86400
           }
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/session.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/hook.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
             "asyncRewake": true,
             "timeout": 86400
           }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/session.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/hook.py\" watch --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
             "asyncRewake": true,
             "timeout": 86400
           }
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/session.py\" end --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/mcp/hook.py\" end --agent claude; else echo \"ACDC: Python 3.11+ is required; install it and reopen this session.\" >&2; exit 0; fi",
             "timeout": 5
           }
         ]
