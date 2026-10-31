@@ -135,7 +135,7 @@ The OKF bundle checker additionally needs [Node.js](https://nodejs.org) on PATH.
 
 ## Privacy & limitations
 
-- ACDC reads local session files on your machine to build a handoff or recall summary. It does **not** upload anything to an external service, and it does **not** sanitize or redact transcript content.
+- ACDC reads local session files for recall and handoff. Selected context enters an agent conversation and follows that agent provider's privacy policy. Native transcript content is not sanitized or redacted.
 - Each plugin needs local filesystem access to its own session storage (and to the other agent's storage when used for handoff).
 - Session storage formats are owned by their respective products; large version changes may require parser updates.
 - When multiple sessions match the same name, the skill shows scored candidates and asks.
