@@ -104,6 +104,22 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state, "started")
         self.assertNotEqual(current["pid"], os.getpid())
 
+    async def test_helper_upgrade_does_not_depend_on_launcher_cwd(self):
+        with (
+            patch.object(self.session, "owner_pid", return_value=os.getpid()),
+            patch.object(os, "getcwd", side_effect=FileNotFoundError),
+            patch.object(sys, "executable", str(self.wrapper)),
+            warnings.catch_warnings(),
+        ):
+            warnings.simplefilter("ignore", ResourceWarning)
+            state = await self.session.ensure_codex_discovery()
+        current = json.loads(self.marker.read_text())
+        self.addCleanup(self.stop, current["pid"])
+        self.assertEqual(state, "started")
+        self.assertEqual(
+            Path("/proc/" + str(current["pid"]) + "/cwd").resolve(), self.relay
+        )
+
     async def test_reload_replaces_old_helper_and_records_current_fingerprint(self):
         # Wrapper stands in for the external child process only. The upgrade,
         # PID validation/termination and on-disk registration are real.

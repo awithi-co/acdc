@@ -229,10 +229,12 @@ async def run():
                     ),
                     None,
                 )
-                if target and completed_turns(ch):
+                if target and target.get("ready") and completed_turns(ch):
                     break
                 await asyncio.sleep(0.05)
-            assert target and completed_turns(ch), "Codex did not become ready"
+            assert target and target.get("ready") and completed_turns(ch), (
+                "Codex did not become ready"
+            )
             from websockets.asyncio.client import unix_connect
 
             status = json.loads(
@@ -281,6 +283,10 @@ async def run():
                 ] == "acdc-live-evidence":
                     break
                 await asyncio.sleep(0.05)
+            current = await client.request(target["id"], {"op": "describe"})
+            assert current.get("ready") and current["name"] == "acdc-live-evidence", (
+                "Native discovery did not converge after rename: " + json.dumps(current)
+            )
             prompt = (
                 "ACDC로 현재 열린 acdc-live-evidence라는 Codex 세션과 작업을 작게 나누면 오히려 손해인 경우를 "
                 "두 차례 왕복 토론해줘. 이 이름으로 상대를 지정한 것이니 다시 선택을 묻지 마. "

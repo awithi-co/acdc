@@ -21,6 +21,7 @@ from relay import Relay, PEER_ID
 from evidence import capture, verify
 from native_codex import queue_codex, connect_daemon
 from lifecycle import (
+    current_cwd,
     project_key,
     relay_root,
     owner_pid,
@@ -510,7 +511,7 @@ async def hook(action, agent, data, owner=None):
     info = root.lstat()
     if info.st_uid != os.getuid() or info.st_mode & 0o077 or root.is_symlink():
         raise ValueError("Relay directory must be private and owned by this user")
-    client = Relay(root, agent, data.get("cwd", os.getcwd()), None)
+    client = Relay(root, agent, data.get("cwd") or current_cwd(), None)
     owner = owner if owner is not None else owner_pid(agent)
     if owner is None:
         return 0
@@ -554,7 +555,7 @@ async def hook(action, agent, data, owner=None):
                     if alive(record.get("pid")):
                         return 0
             payload = {
-                "cwd": data.get("cwd", os.getcwd()),
+                "cwd": data.get("cwd") or current_cwd(),
                 "session_id": session_id,
                 "owner_pid": owner,
             }
@@ -574,6 +575,7 @@ async def hook(action, agent, data, owner=None):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
+                cwd=root,
             )
             for _ in range(100):
                 record = read_record(path)
@@ -721,7 +723,7 @@ async def discover_codex_sessions(owner):
             return
         registered = set()
         last_error = None
-        client = Relay(root, "codex", os.getcwd(), None)
+        client = Relay(root, "codex", str(root), None)
         try:
             while alive(owner):
                 try:

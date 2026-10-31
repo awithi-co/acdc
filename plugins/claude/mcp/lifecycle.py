@@ -42,6 +42,14 @@ def project_key(cwd):
     return str(Path(cwd).resolve())
 
 
+def current_cwd():
+    """A cache update can remove a long-lived MCP process's launch directory."""
+    try:
+        return os.getcwd()
+    except FileNotFoundError:
+        return str(Path.home())
+
+
 def relay_root():
     return Path(
         os.environ.get(
@@ -184,7 +192,7 @@ async def ensure_discovery(owner, script):
         if running and _version(status.get("version")) > _version(VERSION):
             return "newer_runtime"
         if running:
-            client = Relay(root, "codex", os.getcwd(), None)
+            client = Relay(root, "codex", str(root), None)
             peers = [
                 peer
                 for peer in await client.peers()
@@ -235,6 +243,7 @@ async def ensure_discovery(owner, script):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
+            cwd=root,
         )
         temporary = marker.with_suffix(f".{os.getpid()}.tmp")
         temporary.write_text(

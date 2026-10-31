@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "acdc",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Discover and collaborate with open Claude Code and Codex CLI sessions; recall and resume prior conversations.",
   "author": {
     "name": "awithi-co"

@@ -266,6 +266,44 @@ class AutoConnectTests(unittest.IsolatedAsyncioTestCase):
                     except ChildProcessError:
                         pass
 
+    async def test_hook_survives_removed_plugin_cache_launch_directory(self):
+        code = """
+import asyncio,json,os,sys
+from pathlib import Path
+from session import hook,record_path,read_record,relay_root
+from relay import Relay
+async def main():
+ root=relay_root(); launch=root/'deleted-plugin-cache'; launch.mkdir()
+ os.chdir(launch); launch.rmdir()
+ try: os.getcwd()
+ except FileNotFoundError: pass
+ else: raise AssertionError('The launch directory was not actually removed')
+ data={'session_id':'33333333-3333-3333-3333-333333333333','cwd':str(root)}
+ try:
+  await hook('start','claude',data,owner=os.getpid())
+  peer=read_record(record_path(root,'claude',data['session_id'],os.getpid()))
+  assert peer and Path('/proc/'+str(peer['pid'])+'/cwd').resolve()==root
+  described=await Relay(root,'claude',str(root),None).request(peer['id'],{'op':'describe'})
+  assert described['cwd']==str(root)
+  await hook('start','claude',data,owner=os.getpid())
+ finally:
+  await hook('end','claude',data,owner=os.getpid())
+asyncio.run(main())
+"""
+        env = dict(
+            os.environ, PYTHONPATH=str(SOURCE.parent), ACDC_RELAY_DIR=str(self.root)
+        )
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-c",
+            code,
+            env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), 5)
+        self.assertEqual(process.returncode, 0, stderr.decode())
+
     async def test_concurrent_start_hooks_do_not_block_the_event_loop(self):
         code = """import asyncio,json,os,sys
 sys.path.insert(0,sys.argv[1])
