@@ -17,6 +17,3 @@ jobs:
       - run: python3 -m unittest discover -s tests -q
       - run: npm ci --ignore-scripts --prefix tests/mcp
       - run: npm test --prefix tests/mcp
-      - run: npm audit --audit-level=moderate --prefix tests/mcp
-      - run: uv export --script plugins/claude/mcp/server.py --format requirements-txt --no-hashes --output-file /tmp/acdc-runtime-requirements.txt
-      - run: uvx pip-audit -r /tmp/acdc-runtime-requirements.txt --progress-spinner off

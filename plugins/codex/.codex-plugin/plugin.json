@@ -1,6 +1,6 @@
 {
   "name": "acdc",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Collaborate with open Claude Code and Codex CLI sessions, recall prior conversations, and resume work across agents.",
   "author": {
     "name": "awithi-co",

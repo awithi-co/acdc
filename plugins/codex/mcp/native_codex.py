@@ -3,54 +3,27 @@
 import asyncio
 from contextlib import asynccontextmanager
 import json
-import re
 
 from version import VERSION
 
-UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 
-
-async def _bounded_output(stream):
-    chunks = []
-    size = 0
-    while chunk := await stream.read(4096):
-        size += len(chunk)
-        if size > 65536:
-            raise ValueError(
-                "Codex CLI output exceeded 64 KiB; delivery outcome unknown"
-            )
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
-async def queue_codex(thread_id, text, remote=None):
-    if not thread_id or not UUID.fullmatch(thread_id):
-        raise ValueError("Codex thread ID is missing or invalid")
-    command = ["codex", "queue", "--thread", thread_id, "--message", text]
-    if remote:
-        command += ["--remote", remote]
-    try:
-        process = await asyncio.create_subprocess_exec(
-            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-    except OSError as error:
-        raise ValueError("Codex CLI is unavailable") from error
+async def queue_codex(thread_id, text):
+    process = await asyncio.create_subprocess_exec(
+        "codex", "queue", "--thread", thread_id, "--message", text,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
     try:
         async with asyncio.timeout(25):
-            _, stderr = await asyncio.gather(
-                _bounded_output(process.stdout), _bounded_output(process.stderr)
-            )
-            await process.wait()
-        if process.returncode:
-            raise ValueError(
-                "Codex queue rejected delivery: "
-                + stderr.decode(errors="replace")[-2000:]
-            )
-        return {"status": "queued", "thread_id": thread_id}
+            _, stderr = await process.communicate()
     finally:
         if process.returncode is None:
             process.kill()
             await process.wait()
+    if process.returncode:
+        raise ValueError(
+            "Codex queue rejected delivery: " + stderr.decode(errors="replace")[-2000:]
+        )
 
 
 class DaemonConnection:

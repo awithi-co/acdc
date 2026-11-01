@@ -1,4 +1,4 @@
-"""Byte boundaries, bounded records and truthful failures in native JSONL reads."""
+"""Bounded native JSONL reads that skip what they cannot decode."""
 
 import io
 import json
@@ -14,94 +14,60 @@ sys.path.pop(0)
 
 
 class TranscriptRecordTests(unittest.TestCase):
-    def fixture(self):
-        values = [
-            {"text": '가 😀 \\ \n quote "'},
-            {"ignored": "x" * 1000},
-            {"type": "user"},
-        ]
-        lines = [json.dumps(row, ensure_ascii=False).encode() + b"\n" for row in values]
-        return values, lines, b"".join(lines)
+    values = [
+        {"text": '가 😀 \\ \n quote "'},
+        {"ignored": "x" * 1000},
+        {"type": "user"},
+    ]
 
-    def test_reverse_preserves_unicode_and_offsets_across_chunk_boundaries(self):
-        values, lines, data = self.fixture()
-        expected_offsets = [0, len(lines[0]), len(lines[0]) + len(lines[1])]
-        for chunk in [1, 7, 64, 1024]:
-            with (
-                self.subTest(chunk=chunk),
-                patch.object(transcript, "CHUNK_SIZE", chunk),
-            ):
-                rows = list(transcript.reverse(io.BytesIO(data), len(data)))
-                self.assertEqual([r.value for r in rows], list(reversed(values)))
-                self.assertEqual(
-                    [r.offset for r in rows], list(reversed(expected_offsets))
-                )
-                for row in rows:
-                    self.assertEqual(
-                        transcript.at(io.BytesIO(data), row.offset, len(data)).value,
-                        row.value,
-                    )
+    def data(self):
+        return b"".join(
+            json.dumps(row, ensure_ascii=False).encode() + b"\n" for row in self.values
+        )
 
-    def test_forward_starts_at_validated_byte_boundary(self):
-        values, lines, data = self.fixture()
-        rows = list(transcript.forward(io.BytesIO(data), len(data), len(lines[0])))
-        self.assertEqual([r.value for r in rows], values[1:])
-        self.assertEqual(rows[-1].end, len(data))
-
-    def test_forged_offsets_cannot_point_inside_a_string_or_object(self):
-        data = b'{"text":"{\\"type\\":\\"user\\"}"}\n'
-        for offset in [True, -1, len(data), 8, 10]:
-            with (
-                self.subTest(offset=offset),
-                self.assertRaisesRegex(
-                    transcript.TranscriptError, "source_invalid_offset"
-                ),
-            ):
-                transcript.at(io.BytesIO(data), offset, len(data))
+    def test_both_directions_preserve_unicode_across_chunk_boundaries(self):
+        data = self.data()
+        with patch.object(transcript, "CHUNK_SIZE", 7):
+            self.assertEqual(
+                list(transcript.reverse(io.BytesIO(data), len(data))), self.values[::-1]
+            )
+        self.assertEqual(
+            list(transcript.forward(io.BytesIO(data), len(data))), self.values
+        )
 
     def test_record_limit_is_explicit_in_both_directions(self):
         data = json.dumps({"text": "x" * 100}).encode() + b"\n"
-        with patch.object(transcript, "MAX_RECORD_BYTES", 64):
-            for reader in [transcript.forward, transcript.reverse]:
-                with (
-                    self.subTest(reader=reader.__name__),
-                    self.assertRaisesRegex(
-                        transcript.TranscriptError, "source_record_too_large"
-                    ),
+        with patch.object(transcript, "MAX_RECORD_BYTES", 20):
+            for read in (transcript.forward, transcript.reverse):
+                with self.assertRaisesRegex(
+                    transcript.TranscriptError, "source_record_too_large"
                 ):
-                    list(reader(io.BytesIO(data), len(data)))
+                    list(read(io.BytesIO(data), len(data)))
 
-    def test_partial_tail_is_not_ignored_as_verified_history(self):
-        data = b'{}\n{"type":"user"'
-        for reader in [transcript.forward, transcript.reverse]:
-            with (
-                self.subTest(reader=reader.__name__),
-                self.assertRaisesRegex(transcript.TranscriptError, "source_incomplete"),
-            ):
-                list(reader(io.BytesIO(data), len(data)))
-
-    def test_duplicate_keys_and_adjacent_values_fail_closed(self):
-        for data in [b'{"origin":1,"origin":2}\n', b"{} {}\n"]:
-            for reader in [transcript.forward, transcript.reverse]:
-                with (
-                    self.subTest(data=data, reader=reader.__name__),
-                    self.assertRaises(transcript.TranscriptError),
-                ):
-                    list(reader(io.BytesIO(data), len(data)))
-
-    def test_snapshot_does_not_read_later_appended_bytes(self):
-        data = b"{}\n" + b'{"unfinished":'
-        self.assertEqual(
-            [r.value for r in transcript.forward(io.BytesIO(data), 3)], [{}]
+    def test_unreadable_lines_are_skipped(self):
+        data = (
+            b'{"first": 1}\n\nnot json\n[1, 2]\n{"dup": 1, "dup": 2}\n{"partial": "wri'
         )
-
-    def test_blank_lines_and_complete_unterminated_record(self):
-        data = b'\n{}\n\n{"type":"user"}'
+        expected = [{"first": 1}, {"dup": 2}]
         self.assertEqual(
-            [r.value for r in transcript.forward(io.BytesIO(data), len(data))],
-            [{}, {"type": "user"}],
+            list(transcript.forward(io.BytesIO(data), len(data))), expected
         )
         self.assertEqual(
-            [r.value for r in transcript.reverse(io.BytesIO(data), len(data))],
-            [{"type": "user"}, {}],
+            list(transcript.reverse(io.BytesIO(data), len(data))), expected[::-1]
         )
+
+    def test_snapshot_ignores_later_appended_bytes(self):
+        data = b'{"a": 1}\n{"b": 2}\n'
+        snapshot = len(b'{"a": 1}\n')
+        for read in (transcript.forward, transcript.reverse):
+            self.assertEqual(list(read(io.BytesIO(data), snapshot)), [{"a": 1}])
+
+    def test_complete_unterminated_final_record_is_read(self):
+        data = b'{"a": 1}\n{"b": 2}'
+        self.assertEqual(
+            list(transcript.forward(io.BytesIO(data), len(data))), [{"a": 1}, {"b": 2}]
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

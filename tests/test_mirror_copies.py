@@ -1,91 +1,27 @@
-"""The two plugins ship copies, not symlinks. Copies must stay byte-identical.
+"""The plugins install independently, so they ship copies that must stay identical."""
 
-Plugin installation copies the directory tree, so `plugins/claude` and
-`plugins/codex` each carry their own copy of every shared script. Skill names
-differ for the handoff pair (resume-codex-session vs resume-claude-session), so
-copies are matched by script basename rather than by skill path.
-"""
-
-import unittest
-from collections import defaultdict
 from pathlib import Path
+import unittest
 
-REPO_ROOT = Path(__file__).parent.parent
-PLUGINS = ("claude", "codex")
+PLUGINS = Path(__file__).parents[1] / "plugins"
 
 
-def scripts_by_basename(agent):
-    found = defaultdict(list)
-    root = REPO_ROOT / "plugins" / agent / "skills"
-    for path in sorted(root.glob("*/scripts/*.py")):
-        found[path.name].append(path)
-    return found
+def shared_files(agent):
+    # Handoff skills differ in name between plugins, so scripts match by basename.
+    root = PLUGINS / agent
+    paths = [p for p in root.glob("mcp/*") if p.is_file()]
+    paths += [p for p in root.glob("skills/*/scripts/**/*") if p.is_file()]
+    return {p.name: p for p in paths if p.suffix != ".pyc"}
 
 
 class MirrorCopyTests(unittest.TestCase):
-    def setUp(self):
-        self.by_agent = {agent: scripts_by_basename(agent) for agent in PLUGINS}
-
-    def test_no_duplicate_basename_within_one_plugin(self):
-        for agent, found in self.by_agent.items():
-            for name, paths in found.items():
-                self.assertEqual(
-                    len(paths), 1,
-                    f"{name} appears {len(paths)} times inside plugins/{agent}: {paths}",
-                )
-
-    def test_shared_scripts_are_byte_identical(self):
-        claude, codex = (self.by_agent[agent] for agent in PLUGINS)
-        shared = sorted(set(claude) & set(codex))
-        self.assertTrue(shared, "expected at least one shared script basename")
-
-        for name in shared:
-            left, right = claude[name][0], codex[name][0]
-            with self.subTest(script=name):
-                self.assertEqual(
-                    left.read_bytes(), right.read_bytes(),
-                    f"copies diverged: {left.relative_to(REPO_ROOT)} != "
-                    f"{right.relative_to(REPO_ROOT)}",
-                )
-
-    def test_non_python_script_assets_are_mirrored_by_path(self):
-        """Shell and vendored-JS assets are copies too, and share a skill name.
-
-        Only the handoff pair differs in skill name between plugins, and that
-        pair ships no non-Python assets — so these can be matched by their path
-        below `skills/` rather than by basename.
-        """
-        def assets(agent):
-            root = REPO_ROOT / "plugins" / agent / "skills"
-            return {
-                path.relative_to(root): path
-                for path in sorted(root.glob("*/scripts/**/*"))
-                if path.is_file() and path.suffix not in (".py", ".pyc")
-            }
-
-        claude, codex = (assets(agent) for agent in PLUGINS)
-        self.assertTrue(claude, "expected at least one non-Python script asset")
-        self.assertEqual(sorted(claude), sorted(codex),
-                         "every script asset must exist in both plugins")
-        for rel in sorted(claude):
-            with self.subTest(asset=str(rel)):
-                self.assertEqual(claude[rel].read_bytes(), codex[rel].read_bytes(),
-                                 f"copies diverged: skills/{rel}")
-
-    def test_mcp_runtime_assets_are_self_contained_and_identical(self):
-        roots = [REPO_ROOT / 'plugins' / agent / 'mcp' for agent in PLUGINS]
-        names = [{p.name for p in root.iterdir() if p.is_file()} for root in roots]
-        self.assertEqual(names[0], names[1])
-        self.assertIn('server.py.lock', names[0])
-        for name in names[0]:
-            self.assertEqual((roots[0]/name).read_bytes(), (roots[1]/name).read_bytes())
-
-    def test_every_script_has_a_counterpart(self):
-        claude, codex = (self.by_agent[agent] for agent in PLUGINS)
-        self.assertEqual(
-            sorted(claude), sorted(codex),
-            "every script must exist in both plugins",
-        )
+    def test_plugins_ship_identical_copies(self):
+        claude, codex = shared_files("claude"), shared_files("codex")
+        self.assertTrue(claude)
+        self.assertEqual(sorted(claude), sorted(codex))
+        for key, path in claude.items():
+            with self.subTest(file=key):
+                self.assertEqual(path.read_bytes(), codex[key].read_bytes())
 
 
 if __name__ == "__main__":

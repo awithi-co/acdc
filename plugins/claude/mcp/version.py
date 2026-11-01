@@ -3,8 +3,8 @@
 import hashlib
 from pathlib import Path
 
-VERSION = "0.5.1"
-PROTOCOL_VERSION = 1
+VERSION = "0.6.0"
+PROTOCOL_VERSION = 2
 
 
 def _runtime_id():
