@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 — 2026-11-01
+
+### Changed
+
+- A connection the user asked for is the authorization. Agents no longer re-verify evidence before each reply, and long conversations no longer stall on `incomplete_user_history`.
+- `connection_status` returns the initiating user's recent inputs as plain text for context, replacing hash-pinned references and evidence states.
+- Peer messages carry a one-line notice and only the sender's name and agent, cutting fixed overhead from about 2,300 to about 200 characters.
+- Connections compare only the protocol version, now 2. Update and reload both plugins.
+- Shorten the collaborate skill and MCP instructions.
+
+### Removed
+
+- The legacy explicit runtime: `scripts/channel_runtime.py`, `ACDC_CODEX_REMOTE`, `ACDC_PEER_NAME`, the Claude channel path and the `register_peer` tool.
+- Connection tokens, readiness states, delivery caps and duplicate validation inside the same-user runtime.
+
+### Fixed
+
+- Unknown transcript record shapes are skipped instead of disabling evidence for the whole session.
+
 ## 0.5.1 — 2026-11-01
 
 ### Fixed

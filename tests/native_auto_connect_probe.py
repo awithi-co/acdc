@@ -283,11 +283,11 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                 from relay import Relay
                 async def exchange():
                     sockets=Path(env['ACDC_RELAY_DIR'])
-                    client=Relay(sockets,'codex',tmp,None)
+                    client=Relay(sockets)
                     target=None
                     for _ in range(600):
                         peers=await client.peers()
-                        target=next((p for p in peers if p.get('automatic') and p.get('ready') and p['agent']==agent),None)
+                        target=next((p for p in peers if p['agent']==agent),None)
                         if target:break
                         await asyncio.sleep(.05)
                     assert target, 'Plugin did not automatically register a session'
@@ -326,7 +326,7 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                         for _ in range(600):
                             terminal.pump()
                             peers=await client.peers()
-                            counterpart=next((p for p in peers if p.get('automatic') and p.get('ready') and p['agent']!=agent),None)
+                            counterpart=next((p for p in peers if p['agent']!=agent),None)
                             if counterpart:break
                             await asyncio.sleep(.05)
                         assert counterpart, 'Other native CLI was not discovered'
@@ -350,7 +350,7 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                                 for _ in range(600):
                                     second.pump()
                                     peers=await client.peers()
-                                    second_id=next((p['id'] for p in peers if p.get('automatic') and p['agent']=='codex' and p['id']!=target['id']),None)
+                                    second_id=next((p['id'] for p in peers if p['agent']=='codex' and p['id']!=target['id']),None)
                                     if second_id:break
                                     await asyncio.sleep(.03)
                                 assert second_id,'Second native Codex session was not discovered'

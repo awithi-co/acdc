@@ -1,4 +1,4 @@
-"""Private runtime registry, process liveness and safe helper upgrades."""
+"""Private runtime registry, process liveness and helper replacement."""
 
 import asyncio
 from contextlib import asynccontextmanager
@@ -7,16 +7,13 @@ from functools import lru_cache
 import json
 import os
 from pathlib import Path
-import re
 import signal
 import subprocess
 import sys
 import tempfile
 
-from relay import Relay, PEER_ID
-from version import VERSION, RUNTIME_ID
-
-UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
+from relay import Relay, ensure_root
+from version import RUNTIME_ID
 
 
 @lru_cache(maxsize=256)
@@ -85,23 +82,13 @@ def owner_pid(agent):
 def alive(pid):
     try:
         os.kill(pid, 0)
-        if Path("/proc/self/stat").exists():
-            try:
-                state = (
-                    Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
-                )
-                if state in ("Z", "X"):
-                    return False
-            except FileNotFoundError:
-                return False
-        return True
-    except (OSError, TypeError):
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+        return state not in ("Z", "X")
+    except (OSError, TypeError, IndexError):
         return False
 
 
 def record_path(root, agent, session_id, owner):
-    if not UUID.fullmatch(session_id):
-        raise ValueError("Invalid session identity")
     return Path(root) / f"{agent}-{session_id}-{owner}.json"
 
 
@@ -112,17 +99,21 @@ def current_path(root, agent, owner):
 def read_record(path):
     try:
         value = json.loads(path.read_text())
-        if not isinstance(value, dict) or not PEER_ID.fullmatch(value.get("id", "")):
-            return None
-        return value
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError):
         return None
+    return value if isinstance(value, dict) else None
+
+
+def write_record(path, value):
+    temporary = path.with_suffix(f".{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(value))
+    temporary.chmod(0o600)
+    temporary.replace(path)
 
 
 @asynccontextmanager
 async def exclusive_lock(path):
-    # Nonblocking acquisition is essential: two tasks in the same event loop
-    # must not deadlock while the lock holder awaits subprocess/socket I/O.
+    # Nonblocking acquisition keeps two tasks in one event loop from deadlocking.
     with path.open("a") as lock:
         while True:
             try:
@@ -136,99 +127,39 @@ async def exclusive_lock(path):
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
-def _version(value):
+def _is_discovery_process(pid, owner):
+    """A stale marker's PID may now be someone else's; never signal that process."""
     try:
-        return tuple(int(part) for part in value.split("."))
-    except (AttributeError, ValueError):
-        return (0,)
-
-
-def _owned_discovery_process(pid, owner):
-    try:
-        process = Path(f"/proc/{pid}")
-        if process.stat().st_uid != os.getuid():
-            return False
-        args = process.joinpath("cmdline").read_bytes().decode().split("\0")
-        scripts = [
-            index
-            for index, arg in enumerate(args)
-            if Path(arg).name == "session.py" and Path(arg).parent.name == "mcp"
-        ]
-        if len(scripts) != 1 or args[scripts[0] + 1] != "discover":
-            return False
-        return (
-            args[args.index("--agent") + 1] == "codex"
-            and json.loads(args[args.index("--data") + 1]).get("owner_pid") == owner
-        )
-    except (OSError, ValueError, IndexError, UnicodeError):
+        args = Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace")
+    except OSError:
         return False
+    return "session.py" in args and "discover" in args and f'"owner_pid": {owner}' in args
 
 
 async def ensure_discovery(owner, script):
+    """Run one discovery helper per Codex CLI, replacing it after a plugin update."""
     if owner is None:
-        return "unsupported"
+        return
     root = relay_root()
-    root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    info = root.lstat()
-    if info.st_uid != os.getuid() or info.st_mode & 0o077 or root.is_symlink():
-        raise ValueError("Relay directory must be private and owned by this user")
+    ensure_root(root)
     marker = root / f"codex-{owner}.discovery.json"
     async with exclusive_lock(root / f"codex-{owner}.discovery-start.lock"):
-        try:
-            status = json.loads(marker.read_text())
-        except (OSError, ValueError):
-            status = {}
-        running = (
-            status.get("owner_pid") == owner
-            and alive(status.get("pid"))
-            and _owned_discovery_process(status["pid"], owner)
-        )
-        if (
-            running
-            and status.get("runtime_id") == RUNTIME_ID
-            and Path(status.get("script_path", "")).is_file()
-        ):
-            return "ready"
-        if running and _version(status.get("version")) > _version(VERSION):
-            return "newer_runtime"
-        if running:
-            client = Relay(root, "codex", str(root), None)
-            peers = [
-                peer
-                for peer in await client.peers()
-                if peer.get("automatic")
-                and peer.get("agent") == "codex"
-                and peer.get("owner_pid") == owner
-            ]
-            if any(peer.get("connected_to") for peer in peers):
-                return "upgrade_pending"
-            visible = {peer["id"] for peer in peers}
-            for record in root.glob(f"codex-*-{owner}.json"):
-                row = read_record(record)
-                if row and row["id"] not in visible and alive(row.get("pid")):
-                    return "upgrade_pending"
-            # Never signal a reused PID or an unrelated user process.
-            if not _owned_discovery_process(status["pid"], owner):
-                return "upgrade_pending"
-            os.kill(status["pid"], signal.SIGTERM)
+        status = read_record(marker) or {}
+        pid = status.get("pid")
+        if alive(pid) and _is_discovery_process(pid, owner):
+            if status.get("runtime_id") == RUNTIME_ID:
+                return
+            # Brokers exit with their helper, so wait until no session is paired.
+            for peer in await Relay(root).peers():
+                if peer.get("owner_pid") == owner and peer.get("connected_to"):
+                    return
+            os.kill(pid, signal.SIGTERM)
             for _ in range(100):
-                if not alive(status["pid"]):
+                if not alive(pid):
                     break
                 await asyncio.sleep(0.05)
             else:
-                return "upgrade_pending"
-            outdated = [peer for peer in peers if peer.get("runtime_id") != RUNTIME_ID]
-            for peer in outdated:
-                try:
-                    await client.request(peer["id"], {"op": "shutdown"}, timeout=2)
-                except (ConnectionError, ValueError):
-                    pass
-            for _ in range(100):
-                if all(not alive(peer.get("pid")) for peer in outdated):
-                    break
-                await asyncio.sleep(0.05)
-            else:
-                return "upgrade_pending"
+                return
         child = subprocess.Popen(
             [
                 sys.executable,
@@ -245,18 +176,4 @@ async def ensure_discovery(owner, script):
             start_new_session=True,
             cwd=root,
         )
-        temporary = marker.with_suffix(f".{os.getpid()}.tmp")
-        temporary.write_text(
-            json.dumps(
-                {
-                    "pid": child.pid,
-                    "owner_pid": owner,
-                    "version": VERSION,
-                    "runtime_id": RUNTIME_ID,
-                    "script_path": str(script),
-                }
-            )
-        )
-        temporary.chmod(0o600)
-        temporary.replace(marker)
-        return "started"
+        write_record(marker, {"pid": child.pid, "runtime_id": RUNTIME_ID})

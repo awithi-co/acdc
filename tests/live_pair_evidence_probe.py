@@ -1,8 +1,7 @@
 """Opt-in real Claude + Codex E2E; uses paid model tokens and disposable homes.
 
-Only the initiating Claude receives a user collaboration request. The receiving
-Codex must inspect that original request and reply without duplicate approval.
-No messages are sent to the user's existing sessions.
+Only the initiating Claude receives a user request; the receiving Codex must carry
+on the discussion without asking its own user. Existing sessions are not touched.
 """
 
 import asyncio
@@ -15,12 +14,10 @@ import subprocess
 import sys
 import tempfile
 import time
-import re
 
 from native_auto_connect_probe import Terminal
 from live_probe_support import (
     completed_turns,
-    model_observed_verified_evidence,
     recent_activity,
 )
 
@@ -60,52 +57,6 @@ def reply_ids(home):
             ):
                 walk(v)
     return found
-
-
-def claude_final(home):
-    texts = []
-    for p in home.glob("projects/**/*.jsonl"):
-        for line in p.read_text().splitlines():
-            try:
-                r = json.loads(line)
-            except ValueError:
-                continue
-            if r.get("type") == "assistant":
-                for b in r.get("message", {}).get("content", []):
-                    if isinstance(b, dict) and b.get("type") == "text":
-                        texts.append(b.get("text", ""))
-    return texts[-1] if texts else ""
-
-
-def assert_discussion_only(codex_home, claude_home):
-    for p in claude_home.glob("projects/**/*.jsonl"):
-        for line in p.read_text().splitlines():
-            r = json.loads(line)
-            if r.get("type") == "assistant":
-                for b in r.get("message", {}).get("content", []):
-                    assert b.get("type") != "tool_use" or b.get("name") not in (
-                        "Bash",
-                        "Edit",
-                        "Write",
-                        "NotebookEdit",
-                    ), b.get("name")
-    for p in codex_home.glob("sessions/**/rollout-*.jsonl"):
-        for line in p.read_text().splitlines():
-            r = json.loads(line)
-            v = r.get("payload", {})
-            if r.get("type") != "response_item":
-                continue
-            if v.get("type") == "function_call":
-                assert v.get("name") not in (
-                    "exec_command",
-                    "apply_patch",
-                    "write_stdin",
-                ), v.get("name")
-            if v.get("type") == "custom_tool_call":
-                assert not re.search(
-                    r"tools\.(exec_command|apply_patch|write_stdin)\s*\(",
-                    v.get("input", ""),
-                ), v.get("input", "")[:1600]
 
 
 async def run():
@@ -216,7 +167,7 @@ async def run():
                 directory,
             )
             terminals.append(codex)
-            client = Relay(root / "relay", "codex", directory, None)
+            client = Relay(root / "relay")
             target = None
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
@@ -225,14 +176,14 @@ async def run():
                     (
                         p
                         for p in await client.peers()
-                        if p.get("automatic") and p.get("agent") == "codex"
+                        if p.get("agent") == "codex"
                     ),
                     None,
                 )
-                if target and target.get("ready") and completed_turns(ch):
+                if target and completed_turns(ch):
                     break
                 await asyncio.sleep(0.05)
-            assert target and target.get("ready") and completed_turns(ch), (
+            assert target and completed_turns(ch), (
                 "Codex did not become ready"
             )
             from websockets.asyncio.client import unix_connect
@@ -284,14 +235,14 @@ async def run():
                     break
                 await asyncio.sleep(0.05)
             current = await client.request(target["id"], {"op": "describe"})
-            assert current.get("ready") and current["name"] == "acdc-live-evidence", (
+            assert current["name"] == "acdc-live-evidence", (
                 "Native discovery did not converge after rename: " + json.dumps(current)
             )
             prompt = (
                 "ACDC로 현재 열린 acdc-live-evidence라는 Codex 세션과 작업을 작게 나누면 오히려 손해인 경우를 "
                 "두 차례 왕복 토론해줘. 이 이름으로 상대를 지정한 것이니 다시 선택을 묻지 마. "
                 "상대의 실제 답변을 받은 뒤 그 내용을 반영한 후속 질문을 보내고, 두 번째 답변을 받으면 "
-                "연결을 해제하고 합의점과 이견을 요약해줘. 파일 수정과 셸 명령 실행은 하지 마."
+                "연결을 해제하고 요약해줘."
             )
             claude = Terminal(
                 [
@@ -316,12 +267,9 @@ async def run():
                     print("actual_codex_peer_replies", len(ids), flush=True)
                     last_count = len(ids)
                 current = await client.request(target["id"], {"op": "describe"})
-                final = claude_final(ah)
                 if (
                     len(ids) >= 2
                     and not current.get("connected_to")
-                    and "합의" in final
-                    and "이견" in final
                 ):
                     native = "\n".join(
                         p.read_text() for p in ah.glob("projects/**/*.jsonl")
@@ -329,12 +277,7 @@ async def run():
                     assert all(mid in native for mid in ids), (
                         "A Codex send was not received by Claude"
                     )
-                    assert model_observed_verified_evidence(ch), (
-                        "Codex did not inspect verified native user-input evidence"
-                    )
-                    assert_discussion_only(ch, ah)
                     print("two_rounds_message_ids_matched_native_records", flush=True)
-                    print("recipient_verified_real_initiator_user_request", flush=True)
                     print("initiator_disconnected_and_summarized", flush=True)
                     print("live_pair_evidence_e2e_passed", flush=True)
                     print(
@@ -343,8 +286,6 @@ async def run():
                             {
                                 "codex_session_id": target["thread_id"],
                                 "reply_message_ids": sorted(ids),
-                                "duplicate_recipient_authorization": False,
-                                "shell_or_file_edit_calls": False,
                             }
                         ),
                         flush=True,

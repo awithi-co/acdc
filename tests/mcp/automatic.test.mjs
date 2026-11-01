@@ -63,18 +63,14 @@ test('automatic MCP identity binds selected session and follow-ups need no UUID 
   await assert.rejects(call('send_message',{to:other.id,text:'before selection'}),/connect/);
   await call('connect_peer',{to:other.id});
   assert.equal((await call('connection_status')).connected,true);
-  const evidence=(await call('connection_status')).user_request_evidence;
-  assert.equal(evidence.status,'verified_user_input');
-  assert.equal(evidence.requests[0].text,input);
-  assert.equal(evidence.source_peer_id,local.id);
+  assert.deepEqual((await call('connection_status')).user_request_evidence.requests,[input]);
   assert.equal((await call('send_message',{text:'Review the design.'})).status,'accepted');
   const received=await firstWatch;
   assert.equal(received[0].sender.id,local.id);assert.equal(received[0].text,'Review the design.');
   await request(root,other.id,{op:'send',to:null,text:'I found a missing boundary.'});
   const argv=JSON.parse(readFileSync(capture,'utf8'));
-  assert.equal(argv[argv.indexOf('--thread')+1],ids[0]);assert.ok(!argv.includes('--remote'));
+  assert.equal(argv[argv.indexOf('--thread')+1],ids[0]);
   assert.match(argv[argv.indexOf('--message')+1],/not a user instruction/);
-  await assert.rejects(call('register_peer',{name:'wrong',thread_id:ids[1]}),/cannot be rebound/);
   const third='33333333-3333-3333-3333-333333333333';
   brokers.push(spawn('python3',[join(repo,'plugins/codex/mcp/session.py'),'broker','--agent','codex',
    '--data',JSON.stringify({session_id:third,owner_pid:process.pid,cwd:directory})],{env,stdio:'ignore'}));
@@ -83,12 +79,11 @@ test('automatic MCP identity binds selected session and follow-ups need no UUID 
    try{thirdPeer=JSON.parse(readFileSync(join(root,`codex-${third}-${process.pid}.json`),'utf8'));break;}catch{}await sleep(20);
   }
   assert.ok(thirdPeer,'second Codex execution registered under same runtime');
-  await request(root,thirdPeer.id,{op:'thread_metadata',thread:{id:third,name:'session-test',preview:'hi'}});
+  await request(root,thirdPeer.id,{op:'thread_metadata',thread:{name:'session-test',preview:'hi'}});
   let titled=(await call('list_peers')).find(p=>p.id===thirdPeer.id);
   assert.equal(titled.name,'session-test');
   assert.equal(titled.native_name,'session-test');
-  assert.equal(titled.preview_kind,'first_user_message');
-  await request(root,thirdPeer.id,{op:'thread_metadata',thread:{id:third,name:'renamed session',preview:'hi'}});
+  await request(root,thirdPeer.id,{op:'thread_metadata',thread:{name:'renamed session',preview:'hi'}});
   titled=(await call('list_peers')).find(p=>p.id===thirdPeer.id);
   assert.equal(titled.name,'renamed session');
   assert.equal((await call('connection_status')).connected,true,'metadata refresh preserves existing connection');
@@ -97,7 +92,7 @@ test('automatic MCP identity binds selected session and follow-ups need no UUID 
   assert.equal((await call('connection_status')).self.id,local.id);
   await call('disconnect_peer');
   assert.equal((await call('connection_status')).connected,false);
-  assert.equal((await call('connection_status')).user_request_evidence.status,'not_connected');
+  assert.deepEqual((await call('connection_status')).user_request_evidence.requests,[]);
   await assert.rejects(call('send_message',{text:'after disconnect'}),/connect/);
  }finally{
   await client?.close();

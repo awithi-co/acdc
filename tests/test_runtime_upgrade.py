@@ -49,10 +49,7 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
             json.dumps(
                 {
                     "pid": self.old.pid,
-                    "owner_pid": os.getpid(),
-                    "version": "0.4.5",
                     "runtime_id": "old",
-                    "script_path": str(script),
                 }
             )
         )
@@ -85,12 +82,7 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_reused_unrelated_pid_does_not_block_recovery_or_get_signaled(self):
         marker = json.loads(self.marker.read_text())
-        marker.update(
-            pid=os.getpid(),
-            runtime_id=self.session.RUNTIME_ID,
-            version="99.0.0",
-            script_path=str(MCP / "session.py"),
-        )
+        marker.update(pid=os.getpid(), runtime_id=self.session.RUNTIME_ID)
         self.marker.write_text(json.dumps(marker))
         with (
             patch.object(self.session, "owner_pid", return_value=os.getpid()),
@@ -98,10 +90,9 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
             warnings.catch_warnings(),
         ):
             warnings.simplefilter("ignore", ResourceWarning)
-            state = await self.session.ensure_codex_discovery()
+            await self.session.ensure_codex_discovery()
         current = json.loads(self.marker.read_text())
         self.addCleanup(self.stop, current["pid"])
-        self.assertEqual(state, "started")
         self.assertNotEqual(current["pid"], os.getpid())
 
     async def test_helper_upgrade_does_not_depend_on_launcher_cwd(self):
@@ -112,10 +103,9 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
             warnings.catch_warnings(),
         ):
             warnings.simplefilter("ignore", ResourceWarning)
-            state = await self.session.ensure_codex_discovery()
+            await self.session.ensure_codex_discovery()
         current = json.loads(self.marker.read_text())
         self.addCleanup(self.stop, current["pid"])
-        self.assertEqual(state, "started")
         self.assertEqual(
             Path("/proc/" + str(current["pid"]) + "/cwd").resolve(), self.relay
         )
@@ -156,10 +146,8 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(a.close)
         self.addAsyncCleanup(b.close)
         await a.connect(b.id)
-        identity = a.id, a.connection_id
         with patch.object(self.session, "owner_pid", return_value=os.getpid()):
-            state = await self.session.ensure_codex_discovery()
-        self.assertEqual(state, "upgrade_pending")
+            await self.session.ensure_codex_discovery()
         self.assertEqual(json.loads(self.marker.read_text())["pid"], self.old.pid)
         self.assertTrue(self.session.alive(self.old.pid))
-        self.assertEqual((a.id, a.connection_id), identity)
+        self.assertEqual(a.connected, b.id)
