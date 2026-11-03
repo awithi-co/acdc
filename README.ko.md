@@ -147,6 +147,16 @@ OKF 번들 검사기는 추가로 PATH에 [Node.js](https://nodejs.org)가 필�
 
 > `find_*_session.py` 또는 `summarize_*.py`를 수정하면 `recall-session/scripts/` 안의 사본도 같이 갱신해야 합니다. 향후 `_vendor/` 같은 공유 위치로 추출 예정.
 
+### 릴리스
+
+Woodstock은 `main`에서 설치하므로 `plugins/`를 바꾸는 머지는 곧 릴리스이며 새 버전이 필요합니다. 버전을 올리지 않으면 설치된 사본이 갱신되지 않을 수 있습니다. 변경 내용은 `CHANGELOG.md`의 `## Unreleased` 아래에 적고 다음을 실행하십시오.
+
+```sh
+python3 scripts/bump_version.py 0.8.0
+```
+
+여섯 곳의 버전 선언을 모두 바꾸고 변경 기록에 날짜를 붙입니다. 버전이 어긋나면 `tests/test_versions.py`가 실패합니다. 0.x 동안 기능 추가나 호환이 깨지는 변경은 마이너, 수정은 패치를 올립니다.
+
 ## 라이선스
 
 MIT
