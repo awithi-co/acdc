@@ -12,6 +12,8 @@ import unittest
 import warnings
 from unittest.mock import patch
 
+from process_support import SOCKET_TMP, process_cwd
+
 MCP = Path(__file__).parents[1] / "plugins/claude/mcp"
 
 
@@ -24,7 +26,7 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.session = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.session)
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(dir=SOCKET_TMP)
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.relay = self.root / "relay"
@@ -107,7 +109,7 @@ class RuntimeUpgradeTests(unittest.IsolatedAsyncioTestCase):
         current = json.loads(self.marker.read_text())
         self.addCleanup(self.stop, current["pid"])
         self.assertEqual(
-            Path("/proc/" + str(current["pid"]) + "/cwd").resolve(), self.relay
+            process_cwd(current["pid"]), self.relay.resolve()
         )
 
     async def test_reload_replaces_old_helper_and_records_current_fingerprint(self):

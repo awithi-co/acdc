@@ -48,12 +48,23 @@ def current_cwd():
 
 
 def relay_root():
+    # macOS caps socket paths at 104 bytes, and its per-user TMPDIR alone is ~50.
+    # A fixed /tmp also keeps processes launched without TMPDIR in the same place.
+    base = "/tmp" if sys.platform == "darwin" else tempfile.gettempdir()
     return Path(
-        os.environ.get(
-            "ACDC_RELAY_DIR",
-            str(Path(tempfile.gettempdir()) / f"acdc-relay-{os.getuid()}"),
-        )
+        os.environ.get("ACDC_RELAY_DIR", str(Path(base) / f"acdc-relay-{os.getuid()}"))
     )
+
+
+def _ps(pid, field):
+    """Read one process field where /proc is unavailable (macOS)."""
+    result = subprocess.run(
+        ["ps", "-o", f"{field}=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+    return result.stdout.strip()
 
 
 def owner_pid(agent):
@@ -82,9 +93,13 @@ def owner_pid(agent):
 def alive(pid):
     try:
         os.kill(pid, 0)
-        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
-        return state not in ("Z", "X")
-    except (OSError, TypeError, IndexError):
+        stat = Path(f"/proc/{pid}/stat")
+        if stat.parent.parent.is_dir():
+            state = stat.read_text().rsplit(")", 1)[1].split()[0]
+        else:
+            state = _ps(pid, "stat")[:1]
+        return state not in ("", "Z", "X")
+    except (OSError, TypeError, IndexError, subprocess.SubprocessError):
         return False
 
 
@@ -129,9 +144,13 @@ async def exclusive_lock(path):
 
 def _is_discovery_process(pid, owner):
     """A stale marker's PID may now be someone else's; never signal that process."""
+    cmdline = Path(f"/proc/{pid}/cmdline")
     try:
-        args = Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace")
-    except OSError:
+        if cmdline.parent.parent.is_dir():
+            args = cmdline.read_bytes().decode(errors="replace")
+        else:
+            args = _ps(pid, "command")
+    except (OSError, subprocess.SubprocessError):
         return False
     return "session.py" in args and "discover" in args and f'"owner_pid": {owner}' in args
 

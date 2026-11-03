@@ -3,7 +3,7 @@
 import hashlib
 from pathlib import Path
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 PROTOCOL_VERSION = 2
 
 

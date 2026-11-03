@@ -23,7 +23,7 @@ Six skills per agent, each plugin self-contained.
 
 Install the updated plugins, open `claude` and `codex` normally, and ask either one to collaborate. ACDC discovers available sessions and asks which one to connect; follow-ups keep that selection. No session UUID, Python launcher, port configuration, or Claude channel flag is needed for the automatic CLI path. Initial plugin/tool trust still applies.
 
-Verified with Claude Code 2.1.314 and Codex 0.166.0 on Linux. Claude receives through a bundled background hook; Codex uses its existing shared daemon and native queue. Discovery and waiting do not call a model. Message bodies are held only in a bounded live-session buffer, never an ACDC message database. The MCP runtime requires uv/Python 3.11+. See [delivery semantics, permissions, and supported modes](RELAY.md). Desktop support is not yet claimed.
+Verified with Claude Code 2.1.314 and Codex 0.166.0 on Linux; the same pair is verified on macOS with Claude Code 2.1.317. Claude receives through a bundled background hook; Codex uses its existing shared daemon and native queue. Discovery and waiting do not call a model. Message bodies are held only in a bounded live-session buffer, never an ACDC message database. The MCP runtime requires uv/Python 3.11+. See [delivery semantics, permissions, and supported modes](RELAY.md). Desktop support is not yet claimed.
 
 ## Knowledge: OKF
 
@@ -129,7 +129,7 @@ history.jsonl                                          per-prompt log
 
 ## Requirements
 
-Recall and handoff need Python 3. CLI collaboration additionally requires Linux, Python 3.11+ on PATH as `python3`, and `uv` for the locked MCP dependencies. See [supported modes and recovery](RELAY.md).
+Recall and handoff need Python 3. CLI collaboration additionally requires Linux or macOS, Python 3.11+ on PATH as `python3`, and `uv` for the locked MCP dependencies. See [supported modes and recovery](RELAY.md).
 
 The OKF bundle checker additionally needs [Node.js](https://nodejs.org) on PATH. Only `okf_check.sh` uses it; the recall and handoff skills do not.
 

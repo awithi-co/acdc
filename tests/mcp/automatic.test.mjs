@@ -21,7 +21,8 @@ function request(root,id,data){return new Promise((resolve,reject)=>{
 });}
 
 test('automatic MCP identity binds selected session and follow-ups need no UUID or target',async()=>{
- const directory=mkdtempSync(join(tmpdir(),'acdc-auto-'));
+ // macOS caps Unix socket paths at 104 bytes; its default TMPDIR is too long.
+ const directory=mkdtempSync(join(process.platform==='darwin'?'/tmp':tmpdir(),'acdc-auto-'));
  const root=join(directory,'s');mkdirSync(root,{mode:0o700});
  const bin=join(directory,'bin');mkdirSync(bin);
  const capture=join(directory,'queue.json');

@@ -1,6 +1,7 @@
 """Isolated interactive CLI probes using local fake models; no paid model calls.
 
 Run with python3 tests/native_auto_connect_probe.py claude|codex.
+On macOS, run with TMPDIR=/tmp so relay socket paths fit the 104-byte limit.
 Temporary homes/settings isolate the user's open sessions. The probe exercises
 the real CLIs, not a mocked queue or hook runner.
 """
@@ -168,9 +169,28 @@ class Terminal:
         self.master=None
 
 
+def codex_update_loops():
+    """(pid, command) of Codex daemon updaters, with or without /proc."""
+    if Path('/proc').is_dir():
+        for proc in Path('/proc').glob('[0-9]*'):
+            try:
+                args=(proc/'cmdline').read_bytes().split(b'\0')
+                if b'pid-update-loop' in args:
+                    yield int(proc.name),args[0].decode(errors='replace')
+            except (OSError,ValueError):pass
+        return
+    listing=subprocess.run(['ps','-axo','pid=,command='],capture_output=True,text=True).stdout
+    for line in listing.splitlines():
+        pid,_,command=line.strip().partition(' ')
+        if command.endswith(' pid-update-loop'):
+            yield int(pid),command
+
+
 def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, reload_plugin=False):
     workspace = nullcontext(tempfile.mkdtemp(prefix=f'acdc-native-{agent}-')) if os.environ.get('ACDC_KEEP_PROBE') else tempfile.TemporaryDirectory(prefix=f'acdc-native-{agent}-')
     with workspace as tmp:
+        # macOS /tmp is a symlink; the CLIs trust and report the resolved path.
+        tmp=str(Path(tmp).resolve())
         if os.environ.get('ACDC_KEEP_PROBE'):print('probe_artifacts',tmp,flush=True)
         root = Path(tmp)
         home = root/'home'
@@ -197,6 +217,8 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
             env.pop('ANTHROPIC_AUTH_TOKEN',None)
             (home/'.claude.json').write_text(json.dumps({'hasCompletedOnboarding':True,
                 'theme':'dark','bypassPermissionsModeAccepted':True,
+                # Pre-approve the probe key; a slow start can miss the key dialog.
+                'customApiKeyResponses':{'approved':['local-probe-not-a-key'[-20:]],'rejected':[]},
                 'projects':{tmp:{'hasTrustDialogAccepted':True}}}))
             hook = root/'wake.py'
             hook.write_text('import pathlib,time,sys,json\n'
@@ -262,7 +284,8 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                 assert not server.requests,'Opening/discovery must not call the model'
                 print(agent,'opened_without_prompt_no_model_calls',flush=True)
             else:
-                terminal.wait(lambda: b'ACDC_LOCAL_ACK_1' in terminal.output)
+                # The CLI may send a side request (e.g. a title) before the prompt.
+                terminal.wait(lambda: b'ACDC_LOCAL_ACK_' in terminal.output)
                 print(agent, 'initial_turn_ok', flush=True)
             if reload_plugin:
                 assert agent=='claude' and automatic and not blank
@@ -422,13 +445,11 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                 time.sleep(.05)
             # The CLI's package updater outlives `daemon stop`; it must not be
             # left running for an already deleted disposable CODEX_HOME.
-            if agent=='codex' and Path('/proc').is_dir():
-                for proc in Path('/proc').glob('[0-9]*'):
-                    try:
-                        args=(proc/'cmdline').read_bytes().split(b'\0')
-                        if args and args[0].startswith(str(home).encode()+b'/') and b'pid-update-loop' in args:
-                            os.kill(int(proc.name),signal.SIGTERM)
-                    except (OSError,ValueError):pass
+            if agent=='codex':
+                for pid,command in codex_update_loops():
+                    if command.startswith(str(home)+'/'):
+                        try:os.kill(pid,signal.SIGTERM)
+                        except OSError:pass
             server.shutdown()
             server.server_close()
 
