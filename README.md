@@ -147,6 +147,16 @@ Each plugin is self-contained: `finder + summarizer` scripts are duplicated rath
 
 > When fixing a bug in `find_*_session.py` or `summarize_*.py`, mirror the fix to the corresponding `recall-session/scripts/` copy. Future work: extract shared helpers to a `_vendor/` location.
 
+### Releasing
+
+Woodstock installs from `main`, so every merge that changes `plugins/` is a release and needs a new version; otherwise installed copies may not update. Write changes under `## Unreleased` in `CHANGELOG.md`, then run:
+
+```sh
+python3 scripts/bump_version.py 0.8.0
+```
+
+It updates all six version declarations and dates the changelog entry. `tests/test_versions.py` fails if they drift apart. Bump the minor version for new features or breaking changes while on 0.x, and the patch version for fixes.
+
 ## License
 
 MIT
