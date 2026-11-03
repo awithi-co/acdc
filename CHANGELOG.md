@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.0 — 2026-11-03
+
+### Added
+
+- CLI collaboration on macOS. Hooks accept macOS, process liveness and helper identity fall back to `ps` where `/proc` is missing, and the runtime directory is `/tmp/acdc-relay-<uid>` so socket paths fit macOS's 104-byte limit. The protocol is unchanged, so 0.6.0 sessions still connect.
+
+### Fixed
+
+- Tests and the native CLI probe run on macOS: short socket directories, `ps`/`lsof` instead of `/proc`, resolved `/tmp` paths, a pre-approved probe API key and cleanup of Codex updater processes.
+
 ## 0.6.0 — 2026-11-01
 
 ### Changed

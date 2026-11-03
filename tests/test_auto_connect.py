@@ -14,6 +14,8 @@ import subprocess
 import warnings
 from unittest.mock import patch
 
+from process_support import SOCKET_TMP, process_state
+
 SOURCE = Path(__file__).parents[1] / "plugins/claude/mcp/session.py"
 
 
@@ -26,7 +28,6 @@ class HookPackagingTests(unittest.TestCase):
         spec.loader.exec_module(module)
         for platform, version, uv in [
             ("win32", (3, 12), "/bin/uv"),
-            ("darwin", (3, 12), "/bin/uv"),
             ("linux", (3, 10), "/bin/uv"),
             ("linux", (3, 12), None),
         ]:
@@ -69,7 +70,7 @@ class AutoConnectTests(unittest.IsolatedAsyncioTestCase):
         spec = importlib.util.spec_from_file_location("acdc_session", SOURCE)
         self.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.module)
-        self.temp = tempfile.TemporaryDirectory()
+        self.temp = tempfile.TemporaryDirectory(dir=SOCKET_TMP)
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name) / "s"
         self.a = await self.session("codex", "/a", "11111111-1111-1111-1111-111111111111")
@@ -283,6 +284,7 @@ import asyncio,os
 from pathlib import Path
 from session import hook,record_path,read_record,relay_root
 from relay import Relay
+from process_support import process_cwd
 async def main():
  root=relay_root(); launch=root/'deleted-plugin-cache'; launch.mkdir()
  os.chdir(launch); launch.rmdir()
@@ -290,14 +292,16 @@ async def main():
  try:
   await hook('start','claude',data,owner=os.getpid())
   peer=read_record(record_path(root,'claude',data['session_id'],os.getpid()))
-  assert peer and Path('/proc/'+str(peer['pid'])+'/cwd').resolve()==root
-  assert (await Relay(root).request(peer['id'],{'op':'describe'}))['cwd']==str(root)
+  assert peer and process_cwd(peer['pid'])==root.resolve()
+  assert (await Relay(root).request(peer['id'],{'op':'describe'}))['cwd']==str(root.resolve())
  finally:
   await hook('end','claude',data,owner=os.getpid())
 asyncio.run(main())
 """
         env = dict(
-            os.environ, PYTHONPATH=str(SOURCE.parent), ACDC_RELAY_DIR=str(self.root)
+            os.environ,
+            PYTHONPATH=os.pathsep.join([str(SOURCE.parent), str(Path(__file__).parent)]),
+            ACDC_RELAY_DIR=str(self.root),
         )
         process = await asyncio.create_subprocess_exec(
             sys.executable,
@@ -337,13 +341,7 @@ asyncio.run(run())
         child = subprocess.Popen([sys.executable, "-c", "pass"])
         try:
             for _ in range(200):
-                state = (
-                    Path(f"/proc/{child.pid}/stat")
-                    .read_text()
-                    .rsplit(")", 1)[1]
-                    .split()[0]
-                )
-                if state == "Z":
+                if process_state(child.pid) == "Z":
                     break
                 await asyncio.sleep(0.01)
             self.assertFalse(self.module.alive(child.pid))

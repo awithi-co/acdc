@@ -2,7 +2,9 @@
 
 ## Supported scope
 
-The automatic path is validated on Linux with Claude Code 2.1.314 and Codex 0.166.0. Install Python 3.11+ as `python3`, `uv`, and the ACDC plugin in both CLIs. Desktop, macOS, remote Codex and `--no-daemon` automatic discovery are unverified.
+The automatic path is validated on Linux with Claude Code 2.1.314 and Codex 0.166.0. It is also validated on macOS with Claude Code 2.1.150 and 2.1.317 and Codex 0.166.0, including a Claude–Codex pair. Install Python 3.11+ as `python3`, `uv`, and the ACDC plugin in both CLIs. Desktop, remote Codex and `--no-daemon` automatic discovery are unverified.
+
+On macOS the runtime directory is `/tmp/acdc-relay-<uid>` rather than the per-user `TMPDIR`, because macOS limits Unix socket paths to 104 bytes. Override it with `ACDC_RELAY_DIR` only with a short path.
 
 Hooks skip unsupported platforms/Python versions and missing `uv` without exit-127 failures; SessionStart explains the missing prerequisite. The first `uv run` downloads locked dependencies from PyPI. If the MCP server fails to start, check `uv --version`, Python 3.11+, network/proxy access to PyPI and the CLI MCP diagnostics, then reopen. Offline first installation and enterprise proxies have not been validated.
 

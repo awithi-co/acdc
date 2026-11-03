@@ -1,7 +1,7 @@
 """Keep unsupported hosts and missing prerequisites out of CLI hook failures.
 
 This entry point intentionally uses only older Python syntax and the standard
-library so version/platform checks run before importing the Linux runtime.
+library so version/platform checks run before importing the Unix runtime.
 """
 
 import runpy
@@ -12,8 +12,8 @@ import sys
 
 def main():
     reason = None
-    if sys.platform != "linux" or sys.version_info < (3, 11):
-        reason = "CLI collaboration requires Linux and Python 3.11+; recall skills remain available."
+    if sys.platform not in ("linux", "darwin") or sys.version_info < (3, 11):
+        reason = "CLI collaboration requires Linux or macOS and Python 3.11+; recall skills remain available."
     elif shutil.which("uv") is None:
         reason = "Install uv and reopen this session to enable CLI collaboration."
     if reason:
