@@ -121,6 +121,19 @@ def _newest_first(agent, stream, size, session_id):
         )
 
 
+MAX_PREVIEW_SCAN_BYTES = 1024 * 1024
+
+
+def first_codex_request(path, session_id):
+    """A Codex rollout's first human input, searched for only near its start."""
+    try:
+        with open(path, "rb") as stream:
+            size = min(os.fstat(stream.fileno()).st_size, MAX_PREVIEW_SCAN_BYTES)
+            return next(_codex_inputs(stream, size, session_id), "")
+    except (TranscriptError, OSError):
+        return ""
+
+
 def recent_requests(agent, session_id):
     """Return recent human inputs, oldest first, within a fixed size budget."""
     try:

@@ -56,6 +56,83 @@ def relay_root():
     )
 
 
+def _load_libproc():
+    """macOS process introspection without spawning ps/lsof on every poll."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        import ctypes
+
+        library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+        library.proc_pidinfo.argtypes = [
+            ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int
+        ]
+        library.proc_pidfdinfo.argtypes = [
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int
+        ]
+        return ctypes, library
+    except (OSError, AttributeError):
+        return None
+
+
+_LIBPROC = _load_libproc()
+# <sys/proc_info.h>: PROC_PIDLISTFDS, PROC_PIDTBSDINFO, PROC_PIDFDVNODEPATHINFO.
+_LIST_FDS, _BSD_INFO, _VNODE_PATH = 1, 3, 2
+_BSD_INFO_SIZE, _VNODE_PATH_SIZE, _VNODE_PATH_OFFSET = 136, 1200, 176
+_FD_TYPE_VNODE, _ZOMBIE = 1, 5
+
+
+def _darwin_running(pid):
+    ctypes, library = _LIBPROC
+    buffer = ctypes.create_string_buffer(_BSD_INFO_SIZE)
+    # A zombie has no task left, so the call fails for it as for an exited PID.
+    if library.proc_pidinfo(pid, _BSD_INFO, 0, buffer, _BSD_INFO_SIZE) != _BSD_INFO_SIZE:
+        return False
+    return int.from_bytes(buffer.raw[4:8], sys.byteorder) != _ZOMBIE
+
+
+def _darwin_open_files(pid):
+    ctypes, library = _LIBPROC
+    size = library.proc_pidinfo(pid, _LIST_FDS, 0, None, 0)
+    if size <= 0:
+        return None
+    buffer = ctypes.create_string_buffer(size + 64 * 8)  # Room for fds opened meanwhile.
+    size = library.proc_pidinfo(pid, _LIST_FDS, 0, buffer, len(buffer))
+    if size <= 0:
+        return None
+    paths = []
+    for offset in range(0, size - size % 8, 8):
+        fd = int.from_bytes(buffer.raw[offset:offset + 4], sys.byteorder, signed=True)
+        kind = int.from_bytes(buffer.raw[offset + 4:offset + 8], sys.byteorder)
+        if kind != _FD_TYPE_VNODE:
+            continue
+        info = ctypes.create_string_buffer(_VNODE_PATH_SIZE)
+        if library.proc_pidfdinfo(pid, fd, _VNODE_PATH, info, _VNODE_PATH_SIZE) == _VNODE_PATH_SIZE:
+            path = info.raw[_VNODE_PATH_OFFSET:].split(b"\0", 1)[0]
+            paths.append(os.fsdecode(path))
+    return paths
+
+
+def open_files(pid):
+    """Paths of files a process holds open, or None if they cannot be read."""
+    fds = Path(f"/proc/{pid}/fd")
+    if fds.parent.parent.is_dir():
+        try:
+            entries = list(fds.iterdir())
+        except OSError:
+            return None
+        paths = []
+        for entry in entries:
+            try:
+                paths.append(os.readlink(entry))
+            except OSError:
+                pass  # Closed while listing.
+        return paths
+    if _LIBPROC is not None:
+        return _darwin_open_files(pid)
+    return None
+
+
 def _ps(pid, field):
     """Read one process field where /proc is unavailable (macOS)."""
     result = subprocess.run(
@@ -96,6 +173,8 @@ def alive(pid):
         stat = Path(f"/proc/{pid}/stat")
         if stat.parent.parent.is_dir():
             state = stat.read_text().rsplit(")", 1)[1].split()[0]
+        elif _LIBPROC is not None:
+            return _darwin_running(pid)
         else:
             state = _ps(pid, "stat")[:1]
         return state not in ("", "Z", "X")
@@ -153,6 +232,17 @@ def _is_discovery_process(pid, owner):
     except (OSError, subprocess.SubprocessError):
         return False
     return "session.py" in args and "discover" in args and f'"owner_pid": {owner}' in args
+
+
+def command_args(pid):
+    """A process's argv, or [] when it cannot be read."""
+    cmdline = Path(f"/proc/{pid}/cmdline")
+    try:
+        if cmdline.parent.parent.is_dir():
+            return cmdline.read_bytes().decode(errors="replace").split("\0")
+        return _ps(pid, "command").split()
+    except (OSError, subprocess.SubprocessError):
+        return []
 
 
 async def ensure_discovery(owner, script):

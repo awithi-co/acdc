@@ -13,7 +13,11 @@ Native CLI integration uses temporary homes, the installed plugin and a local mo
 ```sh
 python3 tests/native_auto_connect_probe.py pair --blank --check-multi
 python3 tests/native_auto_connect_probe.py claude --automatic --reload-plugin
+python3 tests/native_auto_connect_probe.py pair --no-daemon --check-multi
+python3 tests/native_auto_connect_probe.py codex --automatic --no-daemon
 ```
+
+`--no-daemon` launches Codex with its embedded server, as terminal hosts such as Orca do. The Codex run also checks that a message for a just-closed CLI is refused and that resuming the session runs nothing stale.
 
 The real-model E2E is explicitly opt-in and consumes authenticated Claude and Codex tokens:
 

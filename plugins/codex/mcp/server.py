@@ -60,7 +60,7 @@ async def main():
             raise ValueError(
                 "This session is not registered yet. Enable and trust ACDC hooks, run /reload-plugins and send a prompt."
                 if args.agent == "claude"
-                else "This session is not registered yet; check that the shared Codex daemon is running and reload the plugin."
+                else "This session is not registered yet; send a prompt in this Codex session first, then retry or reload the plugin."
             )
         return broker["id"]
 

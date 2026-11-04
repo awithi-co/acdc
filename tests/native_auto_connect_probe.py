@@ -186,7 +186,12 @@ def codex_update_loops():
             yield int(pid),command
 
 
-def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, reload_plugin=False):
+def daemon_state(env):
+    status=subprocess.run(['codex','app-server','daemon','version'],env=env,capture_output=True,text=True,timeout=10)
+    return 'running' if '"running"' in status.stdout else 'absent'
+
+
+def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, reload_plugin=False, no_daemon=False):
     workspace = nullcontext(tempfile.mkdtemp(prefix=f'acdc-native-{agent}-')) if os.environ.get('ACDC_KEEP_PROBE') else tempfile.TemporaryDirectory(prefix=f'acdc-native-{agent}-')
     with workspace as tmp:
         # macOS /tmp is a symlink; the CLIs trust and report the resolved path.
@@ -245,6 +250,9 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
             (home/'config.toml').write_text(config)
             command = ['codex','-C',tmp,'-a','never','-s','read-only','--no-alt-screen',
                        'Reply READY only. Do not use tools.']
+            if no_daemon:
+                # Embedded app server, as terminal hosts such as Orca launch Codex.
+                command.insert(1,'--no-daemon')
             if automatic:
                 repo = Path(__file__).resolve().parents[1]
                 for install in (['codex','plugin','marketplace','add',str(repo),'--json'],
@@ -314,7 +322,28 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                         if target:break
                         await asyncio.sleep(.05)
                     assert target, 'Plugin did not automatically register a session'
-                    if agent=='codex':
+                    if agent=='codex' and no_daemon:
+                        for _ in range(200):
+                            terminal.pump()
+                            current=await client.request(target['id'],{'op':'describe'})
+                            if current.get('preview'):break
+                            await asyncio.sleep(.05)
+                        assert current.get('preview')=='Reply READY only. Do not use tools.',current
+                        print(agent,'embedded_discovery_ok preview_ok daemon',daemon_state(env),flush=True)
+                        # Codex records a TUI rename in its session index; it must reach the peer.
+                        for title in ('session-test','session-test-renamed'):
+                            os.write(terminal.master,f'/rename {title}'.encode())
+                            for _ in range(20):terminal.pump()
+                            os.write(terminal.master,b'\r')
+                            for _ in range(200):
+                                terminal.pump()
+                                current=await client.request(target['id'],{'op':'describe'})
+                                if current.get('native_name')==title:break
+                                await asyncio.sleep(.05)
+                            else:
+                                raise AssertionError('Embedded rename did not reach ACDC: '+title+'\n'+re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',terminal.output.decode(errors='replace'))[-1500:])
+                        print(agent,'embedded_rename_refresh_same_peer_ok',flush=True)
+                    elif agent=='codex':
                         # Exercise the native rename -> discovery -> relay listing path
                         # before selecting a counterpart, inside the disposable home.
                         from websockets.asyncio.client import unix_connect
@@ -367,7 +396,8 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                         else:
                             raise AssertionError('Native pair failed; model tools: '+str([t.get('name') for t in server.requests[-1].get('tools',[])])+'\n'+terminal.output.decode(errors='replace')[-8000:])
                         if agent=='codex' and check_multi:
-                            second=Terminal([p for p in command if p!='Reply READY only. Do not use tools.'],env,tmp)
+                            # An embedded CLI writes no rollout, so it is invisible, until its first prompt.
+                            second=Terminal(command if no_daemon else [p for p in command if p!='Reply READY only. Do not use tools.'],env,tmp)
                             try:
                                 second_id=None
                                 for _ in range(600):
@@ -390,7 +420,12 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                             terminal.pump()
                             if (sockets/f'finished-{counterpart["agent"]}').exists():break
                             await asyncio.sleep(.05)
-                        await client.request(target['id'],{'op':'disconnect'})
+                        if agent=='codex' and check_multi and no_daemon:
+                            # An embedded CLI owns its threads: closing it retires them.
+                            assert not any(p['id']==target['id'] for p in await client.peers()),'Closed CLI left its session listed'
+                            print(agent,'closed_cli_retired_its_session_ok',flush=True)
+                        else:
+                            await client.request(target['id'],{'op':'disconnect'})
                         print(agent,'native_mcp_reply_ok followup_ok',flush=True)
                         return
                     sender=SessionRelay(sockets,'claude',tmp,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',os.getpid())
@@ -407,8 +442,29 @@ def probe(agent, automatic=False, paired=False, blank=False, check_multi=False, 
                                 await asyncio.sleep(.02)
                             else:raise AssertionError(terminal.output.decode(errors='replace')[-8000:])
                         await sender.disconnect()
+                        if no_daemon:
+                            await closed_recipient_check(sender,target)
                     finally:
                         await sender.close()
+                async def closed_recipient_check(sender,target):
+                    # A message queued for a closed CLI would run when the thread is resumed.
+                    nonlocal terminal
+                    terminal.close()
+                    try:
+                        await sender.send(target['id'],'ACDC_AFTER_CLOSE')
+                        raise AssertionError('Delivery to a closed Codex CLI was accepted')
+                    except (ValueError,ConnectionError) as error:
+                        print(agent,'closed_recipient_refused:',str(error)[:80],flush=True)
+                    before=len(server.requests)
+                    terminal=Terminal([p for p in command if p!='Reply READY only. Do not use tools.']+['resume',target['thread_id']],env,tmp)
+                    deadline=time.monotonic()+15
+                    while time.monotonic()<deadline:terminal.pump()
+                    assert not any('ACDC_AFTER_CLOSE' in json.dumps(r.get('input')) for r in server.requests[before:]),'Refused message ran on resume'
+                    assert len(server.requests)==before,'Resuming without a prompt called the model'
+                    peers=await Relay(Path(env['ACDC_RELAY_DIR'])).peers()
+                    assert any(p['thread_id']==target['thread_id'] and p['owner_pid']==terminal.process.pid for p in peers),'Resumed session was not rediscovered'
+                    print(agent,'resumed_session_rediscovered_without_prompt_ok',flush=True)
+                    print(agent,'resume_runs_nothing_stale_ok daemon',daemon_state(env),flush=True)
                 import asyncio
                 asyncio.run(exchange())
                 print(agent,'plugin_auto_registration_ok target_selection_ok repeated_delivery_ok',flush=True)
@@ -462,10 +518,11 @@ if __name__ == '__main__':
     parser.add_argument('--check-multi',action='store_true',help='Verify a second Codex session survives closing the first')
     parser.add_argument('--paired',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--reload-plugin',action='store_true',help='Enable Claude plugin mid-session and exercise /reload-plugins')
+    parser.add_argument('--no-daemon',action='store_true',help='Launch Codex with its embedded server, without the shared daemon')
     args=parser.parse_args()
     if args.agent=='pair':
         with tempfile.TemporaryDirectory(prefix='acdc-pair-') as shared:
-            children=[subprocess.Popen([sys.executable,__file__,agent,'--automatic','--paired']+(['--blank'] if args.blank else [])+(['--check-multi'] if args.check_multi else []),
+            children=[subprocess.Popen([sys.executable,__file__,agent,'--automatic','--paired']+(['--blank'] if args.blank else [])+(['--check-multi'] if args.check_multi else [])+(['--no-daemon'] if args.no_daemon else []),
                        env={**os.environ,'ACDC_PROBE_RELAY':shared},text=True)
                       for agent in ('claude','codex')]
             failures=[]
@@ -474,4 +531,4 @@ if __name__ == '__main__':
                 failures.append(child.returncode)
             assert failures==[0,0],failures
     else:
-        probe(args.agent,args.automatic,args.paired,args.blank,args.check_multi,args.reload_plugin)
+        probe(args.agent,args.automatic,args.paired,args.blank,args.check_multi,args.reload_plugin,args.no_daemon)
