@@ -2,7 +2,7 @@
 
 ## Supported scope
 
-The automatic path is validated on Linux with Claude Code 2.1.314 and Codex 0.166.0. It is also validated on macOS with Claude Code 2.1.150 and 2.1.317 and Codex 0.166.0, including a Claude–Codex pair. Install Python 3.11+ as `python3`, `uv`, and the ACDC plugin in both CLIs. Desktop, remote Codex and `--no-daemon` automatic discovery are unverified.
+The automatic path is validated on Linux with Claude Code 2.1.314 and Codex 0.166.0. It is also validated on macOS with Claude Code 2.1.150 and 2.1.317 and Codex 0.166.0, including a Claude–Codex pair. Install Python 3.11+ as `python3`, `uv`, and the ACDC plugin in both CLIs. On macOS, Codex launched with `--no-daemon` (as terminal hosts such as Orca do) is also validated, alone and paired with Claude. Desktop and remote Codex are unverified.
 
 On macOS the runtime directory is `/tmp/acdc-relay-<uid>` rather than the per-user `TMPDIR`, because macOS limits Unix socket paths to 104 bytes. Override it with `ACDC_RELAY_DIR` only with a short path.
 
@@ -14,7 +14,7 @@ Open both CLIs normally, request collaboration and select the counterpart once. 
 
 Claude receives through `asyncRewake` hooks, without channel flags. After enabling ACDC mid-session, `/reload-plugins` followed by a prompt recovers registration. Hooks must be enabled and trusted. A watcher can expire after about 24 hours idle; the next prompt/tool completion/turn end rearms it. Claude may render wake delivery as a hook interruption; the payload is peer context, not a human command.
 
-Codex discovers routable user sessions through its existing shared daemon. Internal title/subagent sessions are excluded. Loaded sessions can outlive terminal detachment; this is not a list of visible windows. A confirmed unload removes registration; a transient native read failure marks reception unavailable and preserves the connection. Discovery and waiting do not call a model.
+Codex discovers routable user sessions through its existing shared daemon. Internal title/subagent sessions are excluded. Loaded sessions can outlive terminal detachment; this is not a list of visible windows. A CLI with its own embedded server (`--no-daemon`, or while no daemon is reachable) is followed through the session rollouts it holds open instead; its sessions end with the CLI. Such a new session appears after its first prompt, because Codex writes no rollout before it; a resumed one appears at once. Its name follows Codex's session index, including renames. A message for an embedded CLI that has closed is refused rather than queued, so it cannot run when the session is later resumed. The daemon is probed only while its socket exists, so a missing daemon launches no process; a stale socket is re-probed with backoff up to 30 seconds. A confirmed unload removes registration; a transient native read failure marks reception unavailable and preserves the connection. Discovery and waiting do not call a model.
 
 Helpers are scoped to their native owner process. Runtime fingerprints replace inactive outdated helpers and brokers. Active collaborations defer replacement; finish/disconnect, reload the plugins and retry. Incompatible protocol versions are rejected with update guidance. Restarting a CLI remains a recovery option; no manual UUID registration is needed for the automatic path.
 

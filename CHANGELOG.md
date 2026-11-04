@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.0 — 2026-11-03
+
+### Added
+
+- Collaboration with Codex launched with `--no-daemon`, as terminal hosts such as Orca do. Without the shared daemon, discovery follows the session rollouts the CLI holds open, with the session name from Codex's session index (renames included) and the first prompt as preview. A new session appears after its first prompt; a resumed one appears at once.
+
+### Changed
+
+- The Codex daemon is probed only while its socket exists, instead of launching `codex` every second while it is missing; a stale socket is re-probed with backoff up to 30 seconds, and a `--no-daemon` CLI is never probed. Ten CLIs without a daemon went from about 9.7 `codex` launches per second and 8–10% of a CPU core to none and about 1.5%, mostly startup.
+- On macOS, process liveness and open files are read through libproc instead of spawning `ps`.
+
+### Fixed
+
+- A message for a Codex CLI that has just closed is refused instead of queued, so it no longer runs when the session is later resumed.
+
 ## 0.7.0 — 2026-11-03
 
 ### Added

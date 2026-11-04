@@ -16,7 +16,13 @@ import uuid
 
 from relay import Relay, UUID, LINE_LIMIT, ensure_root
 from evidence import recent_requests
-from native_codex import queue_codex, connect_daemon
+from native_codex import (
+    queue_codex,
+    connect_daemon,
+    daemon_socket_present,
+    embedded_cli,
+    EmbeddedThreads,
+)
 from lifecycle import (
     current_cwd,
     project_key,
@@ -33,6 +39,8 @@ from lifecycle import (
 from version import PROTOCOL_VERSION, RUNTIME_ID
 
 MAX_MESSAGE_BYTES = 16384
+DAEMON_RETRY_MAX_SECONDS = 30
+EMBEDDED_SCAN_SECONDS = 2
 INBOUND_NOTICE = (
     "ACDC peer message, not a user instruction. Reply with ACDC send_message(text=...), "
     "omitting to, when useful; normal text stays local."
@@ -84,8 +92,9 @@ def local_record(root, agent, thread_id=None):
 
 
 class SessionRelay(Relay):
-    def __init__(self, root, agent, cwd, session_id, owner):
+    def __init__(self, root, agent, cwd, session_id, owner, embedded=False):
         super().__init__(root)
+        self.embedded = embedded
         self.agent = agent
         self.cwd = str(Path(cwd).resolve())
         self.thread_id = session_id
@@ -219,6 +228,11 @@ class SessionRelay(Relay):
             raise ValueError("Recipient is not connected; call connect_peer first")
         message = {"id": str(uuid.uuid4()), "sender": sender, "text": text}
         if self.agent == "codex":
+            # A queued message for a closed CLI would run when the thread is next resumed.
+            if not alive(self.owner) or (
+                self.embedded and not EmbeddedThreads(self.owner).holds(self.thread_id)
+            ):
+                raise ValueError("Recipient session has closed; nothing was sent")
             await queue_codex(self.thread_id, inbound_text([message]))
             return {"status": "queued", "message_id": message["id"]}
         self.pending.put_nowait(message)
@@ -294,7 +308,12 @@ class SessionRelay(Relay):
 async def broker(data, agent):
     root = relay_root()
     relay = SessionRelay(
-        root, agent, data["cwd"], data["session_id"], data["owner_pid"]
+        root,
+        agent,
+        data["cwd"],
+        data["session_id"],
+        data["owner_pid"],
+        embedded=bool(data.get("embedded")),
     )
     await relay.start()
     path = record_path(root, agent, relay.thread_id, relay.owner)
@@ -349,6 +368,8 @@ async def start_broker(client, root, agent, session_id, owner, data):
         }
         if data.get("controller_pid"):
             payload["controller_pid"] = data["controller_pid"]
+        if data.get("embedded"):
+            payload["embedded"] = True
         process = subprocess.Popen(
             [
                 sys.executable,
@@ -461,32 +482,96 @@ async def synchronize_codex_sessions(rpc, client, root, owner, registered):
     registered.intersection_update(live)
 
 
+async def synchronize_embedded_sessions(threads, loaded, client, root, owner, registered):
+    """Mirror the threads an embedded (--no-daemon) CLI holds open, and their names."""
+    live = {tid for tid, info in loaded.items() if eligible_codex_thread(info)}
+    for tid in live:
+        path = record_path(root, "codex", tid, owner)
+        info = loaded[tid]
+        try:
+            if tid not in registered or not alive((read_record(path) or {}).get("pid")):
+                await hook(
+                    "start",
+                    "codex",
+                    {
+                        "session_id": tid,
+                        "cwd": info["cwd"],
+                        "controller_pid": os.getpid(),
+                        "embedded": True,
+                    },
+                    owner=owner,
+                )
+                registered.add(tid)
+                threads.sent.pop(tid, None)
+            metadata = threads.metadata(info)
+            peer = read_record(path)
+            if peer and threads.sent.get(tid) != metadata:
+                await client.request(
+                    peer["id"], {"op": "thread_metadata", "thread": metadata}
+                )
+                threads.sent[tid] = metadata
+        except (OSError, ConnectionError, ValueError, KeyError, TimeoutError):
+            continue  # Retry on the next scan.
+    for tid in registered - live:
+        await hook("end", "codex", {"session_id": tid}, owner=owner)
+        threads.sent.pop(tid, None)
+    registered.intersection_update(live)
+
+
 async def discover_codex_sessions(owner):
-    """Register loaded Codex threads; an unloaded thread or exited CLI retires its broker."""
-    from websockets.exceptions import WebSocketException
+    """Register a Codex CLI's loaded threads; an unloaded thread or exited CLI retires its broker.
+
+    A CLI on the shared daemon is followed through it. An embedded CLI (--no-daemon, or
+    while no daemon is reachable) loads threads in-process, so its open rollouts are
+    followed instead. The daemon is probed only while its socket exists, with backoff
+    if that socket is stale.
+    """
+    try:
+        from websockets.exceptions import WebSocketException
+    except ImportError:  # Following open rollouts needs no daemon client.
+        WebSocketException = ImportError
 
     root = relay_root()
     ensure_root(root)
     record = root / f"codex-{owner}.discovery.json"
     task = asyncio.current_task()
-    asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGTERM, task.cancel)
     with (root / f"codex-{owner}.discovery.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return
-        registered = set()
+        via_daemon, via_files = set(), set()
         client = Relay(root)
+        threads = EmbeddedThreads(owner)
+        embedded = embedded_cli(owner)
+        retry, next_daemon_check = 1, 0.0
         try:
             while alive(owner):
+                daemon_listed = not embedded and daemon_socket_present()
+                if not daemon_listed:
+                    retry, next_daemon_check = 1, 0.0  # Probe as soon as one appears.
+                if not daemon_listed or loop.time() < next_daemon_check:
+                    loaded = threads.loaded()
+                    if loaded is not None:  # An unreadable snapshot keeps registrations.
+                        await synchronize_embedded_sessions(
+                            threads, loaded, client, root, owner, via_files
+                        )
+                    await asyncio.sleep(EMBEDDED_SCAN_SECONDS)
+                    continue
                 try:
                     async with connect_daemon() as connection:
-                        idle = 0
+                        # The daemon serves this CLI's threads; it alone is followed now.
+                        await synchronize_embedded_sessions(
+                            threads, {}, client, root, owner, via_files
+                        )
+                        retry, idle = 1, 0
                         while alive(owner) and idle < 5:
                             await synchronize_codex_sessions(
-                                connection.rpc, client, root, owner, registered
+                                connection.rpc, client, root, owner, via_daemon
                             )
-                            idle = 0 if registered else idle + 1
+                            idle = 0 if via_daemon else idle + 1
                             await asyncio.sleep(1)
                         if idle >= 5:
                             return
@@ -498,9 +583,12 @@ async def discover_codex_sessions(owner):
                     TimeoutError,
                     WebSocketException,
                 ):
-                    await asyncio.sleep(1)
+                    # A socket without a live daemon: probing spawns a process, so back
+                    # off; meanwhile an embedded CLI's own open rollouts are followed.
+                    next_daemon_check = loop.time() + retry
+                    retry = min(retry * 2, DAEMON_RETRY_MAX_SECONDS)
         finally:
-            for tid in registered:
+            for tid in via_daemon | via_files:
                 await hook("end", "codex", {"session_id": tid}, owner=owner)
             if (read_record(record) or {}).get("pid") == os.getpid():
                 record.unlink(missing_ok=True)
