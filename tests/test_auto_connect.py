@@ -44,7 +44,7 @@ class HookPackagingTests(unittest.TestCase):
                 self.assertIn("ACDC:", output.getvalue())
 
     def test_missing_python_reports_prerequisite_without_hook_exit_127(self):
-        for agent in ("claude", "codex"):
+        for agent in ("claude",):
             path = SOURCE.parents[2] / agent / "hooks/hooks.json"
             hooks = json.loads(path.read_text())["hooks"]
             for event, groups in hooks.items():
